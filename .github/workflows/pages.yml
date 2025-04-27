@@ -26,7 +26,7 @@ jobs:
 
       - name: Build docs
         run: |
-          bun run doc
+          bun run docs
           cp logo.png docs/
 
       - name: Upload GitHub Pages artifact
