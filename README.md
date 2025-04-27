@@ -52,7 +52,7 @@ import {
   lastMessageIncludes,
   loopAgent,
   tool,
-} from "nanoagent";
+} from "@hbbio/nanoagent";
 
 // 1) a trivial tool
 const echo = tool(
@@ -137,7 +137,7 @@ process—behind an HTTP endpoint—yet feel local.
 ### Running a server
 
 ```ts
-import { ToolRegistry, serveMCP, tool, content } from "nanoagent";
+import { ToolRegistry, serveMCP, tool, content } from "@hbbio/nanoagent";
 
 const tools = {
   echo: tool(
@@ -158,7 +158,7 @@ serveMCP(new ToolRegistry(tools), 3123); // → http://localhost:3123/v1/…
 ### Calling remote tools from an agent
 
 ```ts
-import { MCPClient, ToolRegistry } from "nanoagent";
+import { MCPClient, ToolRegistry } from "@hbbio/nanoagent";
 
 const mcp = new MCPClient("http://localhost:3123");
 const echoT = await mcp.registeredTool("echo");
@@ -196,7 +196,7 @@ export CHATGPT_KEY=...
 And then create instances with:
 
 ```ts
-import { ChatModel, ChatGPT4o } from "nanoagent";
+import { ChatModel, ChatGPT4o } from "@hbbio/nanoagent";
 const model = new ChatModel(ChatGPT4o);
 ```
 
@@ -215,7 +215,7 @@ export OLLAMA_HOST=...
 Then run any model, such as:
 
 ```ts
-import { ChatModel, MistralSmall } from "nanoagent";
+import { ChatModel, MistralSmall } from "@hbbio/nanoagent";
 const model = new ChatModel(MistralSmall);
 ```
 

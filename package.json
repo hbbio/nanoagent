@@ -1,7 +1,29 @@
 {
-  "name": "nanoagent",
-  "module": "src/index.ts",
+  "name": "@hbbio/nanoagent",
+  "version": "0.1.0",
+  "description": "Lightweight, purely-functional LLM agent framework for the MCP era.",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist && tsc --project tsconfig.build.json",
+    "check": "biome check src",
+    "lint": "bun run check && tsc --noEmit",
+    "format": "biome format src --write && biome check src --write",
+    "formatReadme": "prettier README.md --prose-wrap always --print-width 78 -w",
+    "docs": "typedoc --entryPoints src/ --out docs/",
+    "prepublishOnly": "bun run lint && bun run build && bun test"
+  },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
     "@types/bun": "latest",
@@ -10,20 +32,15 @@
   "peerDependencies": {
     "typescript": "^5"
   },
-  "dependencies": {},
-  "scripts": {
-    "definitions": "tsc --project tsconfig.json",
-    "prepublishOnly": "npm test && npm run build && npm run check && npm run definitions",
-    "check": "npx @biomejs/biome check src",
-    "format": "npx @biomejs/biome format src --write && npx @biomejs/biome check src --write",
-    "formatReadme": "prettier README.md --prose-wrap always --print-width 78 -w",
-    "docs": "typedoc --entryPoints src/ --out docs/"
-  },
   "author": {
     "name": "Henri Binsztok"
   },
   "repository": {
-    "url": "https://github.com/hbbio/nanoagent"
+    "type": "git",
+    "url": "git+https://github.com/hbbio/nanoagent"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "bun": ">=1.2.0"
+  }
 }
