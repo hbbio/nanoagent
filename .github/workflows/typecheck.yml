@@ -1,0 +1,25 @@
+name: TypeCheck
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check-types:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies
+        run: |
+          bun install
+          bun add -d typescript@5  # install ts locally for CI (peerDep)
+
+      - name: Check TypeScript types
+        run: |
+          npx tsc --noEmit --pretty
