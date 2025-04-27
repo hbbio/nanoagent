@@ -24,7 +24,7 @@ jobs:
       - name: Build docs
         run: |
           bun run docs
-          cp icon.png docs/
+          cp logo.png docs/
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
