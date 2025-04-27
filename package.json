@@ -17,7 +17,7 @@
     "check": "npx @biomejs/biome check src",
     "format": "npx @biomejs/biome format src --write && npx @biomejs/biome check src --write",
     "formatReadme": "prettier README.md --prose-wrap always --print-width 78 -w",
-    "doc": "typedoc --entryPoints src/ --out docs/"
+    "docs": "typedoc --entryPoints src/ --out docs/"
   },
   "author": {
     "name": "Henri Binsztok"
