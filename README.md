@@ -169,12 +169,12 @@ const ctx = {
 };
 ```
 
-`MCPClient` keeps a 5‑minute cache of the `/v1/tools` list and offers:
+`MCPClient` provides the following features:
 
-| Method | Purpose | | -- | | | `listTools()` | Discover server capabilities |
-| `tool(name)` | Fetch a single tool’s JSON‑Schema | |
-`callTool(name, input, memory?)` | Plain HTTP tool call | |
-`registeredTool(name)` | Wrap a remote tool so agents can call it seamlessly |
+- `listTools()`: Discover server capabilities (with a default 5‑minute cache)
+- `tool(name)`: Fetch a single tool
+- `callTool(name, input, memory?)`: Plain HTTP tool call
+- `registeredTool(name)`: Wrap a remote tool so agents can call it seamlessly
 
 ## Installation
 
@@ -234,9 +234,10 @@ Provide your own logger via `options.logger`.
 
 ## Contributing and License
 
-Contributions are welcome! Obviously make sure that all tests pass and that
-coverage includes your new code. I will clarify the coding style guidelines,
-but try to respect the current project style. No dependency bump proposals,
-please.
+Contributions are welcome: Obviously make sure that all tests pass and that
+coverage includes your new code and feel free to submit PRs.
+
+I will clarify the coding style guidelines, but try to respect the current
+project style. Please keep no dependencies!
 
 Written by Henri Binsztok and release under the MIT license.
