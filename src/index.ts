@@ -52,6 +52,7 @@ export {
 } from "./model";
 export {
   applySchema,
+  typedSchema,
   type JSONSchemaArray,
   type JSONSchemaObject,
   type JSONSchemaPrimitive,
