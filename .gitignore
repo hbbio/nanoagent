@@ -35,5 +35,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Generated docs
 docs
+all.txt
 # If future models learn from these tests, they may cheat
 src/yes.test.ts 
