@@ -1,0 +1,410 @@
+## Project overview
+
+NanoAgent is a ~1 kLOC TypeScript micro-framework for LLM agents.  
+It focuses on three pillars:
+
+1. **Deterministic control loop** – pure functions, immutable `AgentState`, no hidden globals.  
+2. **First-class tool calling** – JSON-Schema typed, local or remote (MCP) handlers, automatic argument validation, memory patches.  
+3. **Zero external deps** – runs on Bun / Node, talks to any OpenAI-style endpoint or Ollama.
+
+Core pieces:
+
+| Area        | File            | Role |
+|-------------|-----------------|------|
+| Content     | `content.ts`    | Strongly-typed message payloads (text, json, images). |
+| JSON helper | `json.ts`       | Deterministic, cycle-safe stringify. |
+| Schema      | `schema.ts`     | Tiny JSON-Schema runtime (type-safe). |
+| Tool system | `tool.ts`       | Metadata, helpers, in-memory registry. |
+| Messages    | `message.ts`    | Chat roles, tool-call execution glue. |
+| Model       | `model.ts`      | HTTP wrapper with streaming & abort. |
+| Runtime     | `workflow.ts`   | `stepAgent`, `loopAgent`, multi-stage `Sequence`. |
+| Heuristics  | `yes.ts`        | Small “yes/no” assistants for meta control. |
+
+All functions are exported from the root "@hbbio/nanoagent" package.
+
+---
+
+## Complete public surface
+
+```ts
+/* -------------------------------------------------------------------------- */
+/* content.ts – structured payload helpers                                    */
+/* -------------------------------------------------------------------------- */
+export type TextContent = { type: "text"; text: string };
+export type JsonContent = { type: "json"; data: unknown };
+export type ImageContent = { type: "image"; data: string; mimeType?: string };
+export type ImageURLContent = { type: "image_url"; image_url: { url: string } };
+
+export type Content =
+  | TextContent
+  | JsonContent
+  | ImageContent
+  | ImageURLContent;
+
+export const contentTypes: readonly ["text","json","image","image_url"];
+
+export const text          : (s: string) => TextContent;
+export const isTextContent : (c: Content | null) => c is TextContent;
+export const textIncludes  : (
+  c: Content | null,
+  substr: string,
+  opts?: { caseInsensitive?: boolean }
+) => boolean;
+export const isContent     : (v: unknown) => v is Content;
+export const toContent     : <T>(v: T) => Content;     // str→text, else→json
+export const toText        : (c: Content | null | undefined) => string | undefined;
+
+/* -------------------------------------------------------------------------- */
+/* json.ts – deterministic stringify                                          */
+/* -------------------------------------------------------------------------- */
+export interface CustomRule<T> {
+  test  : (v: unknown) => v is T;
+  output: (v: T) => unknown;
+}
+export const stringify: (
+  value: unknown,
+  opts?: { noFail?: boolean; customRules?: CustomRule<unknown>[] }
+) => string;
+
+/* -------------------------------------------------------------------------- */
+/* schema.ts – minimal JSON-Schema runtime                                    */
+/* -------------------------------------------------------------------------- */
+export type JSONSchemaType =
+  | "string" | "number" | "integer" | "boolean" | "array" | "object";
+
+export type JSONSchemaPrimitive = {
+  type: Exclude<JSONSchemaType,"array"|"object">;
+  description?: string; enum?: string[];
+  default?: unknown; minimum?: number; maximum?: number;
+};
+export type JSONSchemaArray  = { type: "array";  items: JSONSchemaProperty };
+export type JSONSchemaObject = { type: "object"; properties: Record<string,JSONSchemaProperty>; required?: string[] };
+export type JSONSchemaProperty =
+  | JSONSchemaPrimitive | JSONSchemaObject | JSONSchemaArray;
+
+export type TypedSchema<T extends Record<string,unknown>> =
+  JSONSchemaObject & { properties: Record<keyof T & string, JSONSchemaProperty> };
+
+export const typedSchema  : <T extends Record<string,unknown>>(s: TypedSchema<T>) => TypedSchema<T>;
+export const applySchema  : <T extends Record<string,unknown>>(schema: TypedSchema<T>, args: Partial<T>) => T;
+
+/* -------------------------------------------------------------------------- */
+/* tool.ts – metadata, helpers, registry                                      */
+/* -------------------------------------------------------------------------- */
+export type ChatMemory      = Record<string,unknown>;
+export type ChatMemoryPatch = <M extends ChatMemory>(state: M) => M;   // pure
+
+export type Tool = {
+  type: "function";
+  function: { name: string; description?: string; parameters: JSONSchemaObject };
+};
+
+export const ContentJSON                    = "x-content";
+export const ContentMemory                  = "x-memory";
+export const ContentMemoryLambdascriptPatch = "x-memLambda";
+export const ContentMemoryNonSerializablePatch = "x-memPatch";
+
+export type ToolCallResponse<M extends ChatMemory,Out> = {
+  content?: readonly Content[];
+  error?  : string;
+  [typeof ContentJSON]?: Out;
+  [typeof ContentMemory]?: M;
+  [typeof ContentMemoryLambdascriptPatch]?: string;
+  [typeof ContentMemoryNonSerializablePatch]?: ChatMemoryPatch;
+};
+
+export const content: <
+  M extends ChatMemory,
+  Out extends unknown[] | unknown
+>(
+  value: Out,
+  opts?: { memory?: M; memPatch?: ChatMemoryPatch }
+) => ToolCallResponse<M,Out>;
+
+export const error: (e: string | Error) => ToolCallResponse<ChatMemory,never>;
+
+export type ToolHandler<
+  In  = unknown,
+  Out = unknown,
+  M   extends ChatMemory = ChatMemory
+> = (args: In, memory: M) => Promise<ToolCallResponse<M,Out>>;
+
+export const InternalTool = "internal";
+export const ExternalTool = "external";
+export type  ToolType     = typeof InternalTool | typeof ExternalTool;
+
+export type RegisteredTool<In,Out,M extends ChatMemory> = {
+  type   : ToolType;
+  tool   : Tool;
+  handler: ToolHandler<In,Out,M>;
+};
+
+export type Tools<M extends ChatMemory> = {
+  [name: string]:
+    | RegisteredTool<any,any,M>
+    | (() => Promise<RegisteredTool<any,any,M>>);
+};
+
+export const tool = <
+  In extends Record<string,unknown>,
+  Out,
+  M  extends ChatMemory
+>(
+  name       : string,
+  description: string,
+  parameters : TypedSchema<In>,
+  handler    : ToolHandler<In,Out,M>,
+  type?      : ToolType                       // default "internal"
+) => RegisteredTool<In,Out,M>;
+
+export const toolList: <M extends ChatMemory>(t: Tools<M>) => Promise<readonly Tool[]>;
+
+export const composePatches: <M extends ChatMemory>(
+  memory : M,
+  patches: (ChatMemoryPatch | undefined)[]
+) => M;
+
+export class ToolRegistry<M extends ChatMemory> {
+  constructor(initial?: Tools<M>);
+  get tools(): Tools<M>;
+  add<In,Out>(reg: RegisteredTool<In,Out,M>): void;
+  remove(name: string): void;
+  get list(): Promise<readonly Tool[]>;
+  get snapshot(): Tools<M>;
+  call<In,Out>(
+    name  : string,
+    args  : In,
+    memory: M
+  ): Promise<ToolCallResponse<M,Out>>;
+}
+
+/* -------------------------------------------------------------------------- */
+/* message.ts – chat roles & tool-call glue                                   */
+/* -------------------------------------------------------------------------- */
+export type MessageRole =
+  | "system" | "user" | "assistant"
+  | "tool"   | "function"
+  | "system_function" | "tool_response" | "assistant_function_call";
+
+export interface SystemMessage   { role: "system";    content: Content; }
+export interface UserMessage     { role: "user";      content: Content; }
+export interface AssistantMessage{
+  role: "assistant";
+  content: Content | null;
+  tool_calls?: ToolCall[];
+}
+export interface ToolMessage     { role: "tool";   tool_call_id: string; content: Content; }
+export interface FunctionMessage { role: "function"; name: string;       content: Content; }
+
+export type Message =
+  | SystemMessage | UserMessage | AssistantMessage | ToolMessage | FunctionMessage;
+
+/* factories */
+export const SystemMessage   : (c: string | Content) => SystemMessage;
+export const UserMessage     : (c: string | Content) => UserMessage;
+export const AssistantMessage: (
+  c: string | Content | null,
+  tool_calls?: ToolCall[]
+) => AssistantMessage;
+
+/* tool-call plumbing */
+export type ToolCall = {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string | Record<string,unknown> };
+};
+
+export const isAssistantToolCall: (m?: Message) => m is AssistantMessage & { tool_calls: ToolCall[] };
+export const getToolArguments   : (raw: string | Record<string,unknown>) => Record<string,unknown>;
+
+export const executeToolCall: <
+  In  extends Record<string,unknown>,
+  Out,
+  M   extends ChatMemory
+>(
+  call   : ToolCall,
+  handler: ToolHandler<In,Out,M>,
+  schema : TypedSchema<In>,
+  memory : M,
+  mode?  : "openai" | "mcp"
+) => Promise<{ message: ToolMessage; memPatch?: ChatMemoryPatch }>;
+
+export const callToolAndAppend: <M extends ChatMemory>(
+  messages: readonly Message[],
+  memory  : M,
+  tools?  : Tools<M>,
+  opts?   : { mode?: "openai" | "mcp"; logger?: Console }
+) => Promise<{ messages: readonly Message[]; memory: M }>;
+
+/* CompletionRequest types mirror OpenAI HTTP schema and are exported too. */
+
+/* -------------------------------------------------------------------------- */
+/* model.ts – HTTP chat-model wrapper                                         */
+/* -------------------------------------------------------------------------- */
+export interface ChatModelOptions {
+  url: string; name: string; key?: string;
+  stream?: boolean;
+  adder?: ChatMessageAdder;
+  stringifyArguments?: boolean;
+  stringifyContent?: boolean;
+  temperature?: number;
+  removeThink?: boolean;
+}
+
+export type ChatMessageAdder = (
+  history  : readonly Message[],
+  assistant: Message
+) => Promise<readonly Message[]>;
+
+export interface Model {
+  name?: string;
+  complete<Memory extends ChatMemory>(
+    input : readonly Message[],
+    memory?: Memory,
+    tools ?: Tools<Memory>
+  ): Promise<{ messages: readonly Message[]; memory: Memory }>;
+  stop(): Promise<void>;
+}
+
+export const OLLAMA_URL: string;
+export const ollama : (name: string, opts?: Partial<ChatModelOptions>) => ChatModelOptions;
+export const chatgpt: (name: string) => ChatModelOptions;
+
+/* ready-made presets */
+export const Llama32      : ChatModelOptions;
+export const Gemma3Small  : ChatModelOptions;
+export const Gemma3Mid    : ChatModelOptions;
+export const MistralSmall : ChatModelOptions;
+export const Qwen3Tiny    : ChatModelOptions;
+export const ChatGPT4o    : ChatModelOptions;
+export const ChatGPT41    : ChatModelOptions;
+export const ChatGPT41Mini: ChatModelOptions;
+export const ChatGPT41Nano: ChatModelOptions;
+
+/* util */
+export const removeThinkSection: (s: string) => string;
+
+/* main class */
+export class ChatModel implements Model {
+  constructor(opts?: ChatModelOptions);          // default MistralSmall
+  stop(): Promise<void>;                         // abort streaming
+  /* internal helpers: invoke(), makeRequest() are also public */
+}
+
+/* -------------------------------------------------------------------------- */
+/* workflow.ts – agent loop, sequences                                        */
+/* -------------------------------------------------------------------------- */
+export enum HaltKind { AwaitUser="await_user", ToolError="tool_error", Done="done", Stopped="stopped" }
+export type HaltStatus<E = unknown> =
+  | { kind: HaltKind.AwaitUser }
+  | { kind: HaltKind.ToolError; error: E }
+  | { kind: HaltKind.Done }
+  | { kind: HaltKind.Stopped };
+export const awaitUser: HaltStatus;
+
+export type AgentState<M> = {
+  readonly id?: string;
+  readonly model   : Model;
+  readonly messages: readonly Message[];
+  readonly memory ?: M;
+  readonly halted ?: HaltStatus;
+};
+
+export interface AgentContext<M extends ChatMemory> {
+  name?: string;
+  guidelines?: (memory: M) => Promise<string>;
+  getUserInput?: (ctx: AgentContext<M>, st: AgentState<M>) => Promise<string>;
+  isFinal: (st: AgentState<M>) => Promise<boolean>;
+  registry?: ToolRegistry<M>;
+  nextSequence?: (st: AgentState<M>) => Promise<{
+    ctx: AgentContext<M>; state: AgentState<M>; options?: SequenceOptions;
+  }>;
+  controller?: (st: AgentState<M>) => Promise<AgentState<M>>;
+}
+
+export interface SequenceOptions {
+  maxSteps?: number; debug?: boolean; preserveInput?: boolean;
+  logger?: Pick<Console,"log"|"warn"|"error">;
+  yesModel: ChatModel;
+}
+export interface StepOptions { debug?: boolean; logger?: Console; yesModel: ChatModel; }
+
+export const stepAgent: <M extends ChatMemory>(
+  ctx  : AgentContext<M>,
+  state: AgentState<M>,
+  opts : StepOptions
+) => Promise<AgentState<M>>;
+
+export const loopAgent: <M extends ChatMemory>(
+  ctx  : AgentContext<M>,
+  init : AgentState<M>,
+  opts?: SequenceOptions
+) => Promise<AgentState<M>>;
+
+/* Sequencer */
+export class Sequence<M extends ChatMemory> {
+  constructor(ctx: AgentContext<M>, state: AgentState<M>, opts?: SequenceOptions);
+  resetState(state: AgentState<M>): void;
+  stop(): Promise<void>;
+  run (): Promise<AgentState<M>>;
+  next(): Promise<[Sequence<M>, AgentState<M>]>;
+}
+
+export const runWorkflow: <M extends ChatMemory>(
+  first: Sequence<M>
+) => Promise<{ final: AgentState<M>; history: Sequence<M>[] }>;
+
+/* -------------------------------------------------------------------------- */
+/* yes.ts – yes/no heuristics                                                 */
+/* -------------------------------------------------------------------------- */
+export const lastMessageIncludes: (
+  text: string,
+  opts?: { caseInsensitive?: boolean }
+) => ({ messages }: { messages: readonly Message[] }) => Promise<boolean>;
+
+export const answerIsYes: (
+  guidelines: string,
+  model: ChatModel
+) => (content: string | Content | null) => Promise<boolean>;
+
+export const requestsUserInput: (model: ChatModel) =>
+  (content: string | Content | null) => Promise<boolean>;
+
+export const wantsToExit: (model: ChatModel) =>
+  (content: string | Content | null) => Promise<boolean>;
+```
+
+---
+
+### Quick-start template
+
+```ts
+import {
+  typedSchema, content, tool, ToolRegistry,
+  ChatModel, ChatGPT4o, SystemMessage, AgentContext,
+  AgentState, loopAgent, lastMessageIncludes
+} from "@hbbio/nanoagent";
+
+const echo = tool(
+  "echo",
+  "Upper-case echo",
+  typedSchema<{ txt: string }>({
+    type: "object",
+    properties: { txt: { type: "string" } },
+    required: ["txt"],
+  }),
+  async ({ txt }) => content(txt.toUpperCase())
+);
+
+const ctx: AgentContext<Record<string,never>> = {
+  registry: new ToolRegistry({ echo }),
+  isFinal : lastMessageIncludes("BYE"),
+};
+
+const init: AgentState<Record<string,never>> = {
+  model   : new ChatModel(ChatGPT4o),
+  messages: [SystemMessage("Say BYE when done.")],
+};
+
+await loopAgent(ctx, init);
+```
