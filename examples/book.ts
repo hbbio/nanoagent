@@ -26,7 +26,7 @@ import {
   typedSchema
 } from "../src";
 
-import { writeFile } from "node:fs/promises";
+import { appendFile, writeFile } from "node:fs/promises";
 
 /* -------------------------------------------------------------------------- */
 /* Helper types                                                                */
@@ -45,6 +45,8 @@ interface Chapter {
 
 export interface BookMemory {
   prompt: string;
+  /** where to write incremental output */
+  path?: string;
   title?: string;
   outline?: ChapterOutline[];
   chapters?: Chapter[];
@@ -92,32 +94,42 @@ const createOutline = tool(
 
 const writeChapter = tool(
   "write_chapter",
-  "Write the prose of a given chapter index.",
-  typedSchema<{ index: number }>({
+  "Write the prose of a given chapter number (1-based).",
+  // now accepts { chapter_number: number } (and will ignore any extra 'title' field)
+  typedSchema<{ chapter_number: number; title?: string }>({
     type: "object",
-    properties: { index: { type: "integer", minimum: 0 } },
-    required: ["index"]
+    properties: {
+      chapter_number: { type: "integer", minimum: 1 },
+      title: { type: "string" }
+    },
+    required: ["chapter_number"]
   }),
-  async ({ index }, memory) => {
+  async ({ chapter_number }, memory) => {
+    // convert to zero-based index
+    const index = chapter_number - 1;
     if (!memory.outline?.[index]) return content([]);
 
     const { title, summary } = memory.outline[index];
     const model = new ChatModel(MistralSmall);
     const sys = SystemMessage(
-      "You are a meticulous technical writer. Compose well‑structured prose (~2500 words). Do NOT ask the reader any question and do NOT request feedback."
+      "You are a meticulous technical writer. Compose well-structured prose (~2500 words). Do NOT ask the reader any question and do NOT request feedback."
     );
     const user = UserMessage(
-      `Write chapter ${index + 1}: "${title}" – ${summary}.`
+      `Write chapter ${chapter_number}: "${title}" – ${summary}.`
     );
     const { messages } = await model.complete([sys, user]);
     const prose = toText(messages[messages.length - 1].content) ?? "";
 
     const chapter: Chapter = { index, title, content: prose };
-    const chapters: Chapter[] = [];
-    for (const c of memory.chapters ?? [])
-      if (c.index !== index) chapters.push(c);
+    // replace any existing chapter at this index
+    const chapters = (memory.chapters ?? []).filter((c) => c.index !== index);
     chapters.push(chapter);
 
+    // as soon as this chapter is done, append it to disk
+    const snippet = `## Chapter ${chapter_number}. ${title}\n\n${prose.trim()}\n\n`;
+    if (memory.path) {
+      await appendFile(memory.path, snippet, "utf8");
+    }
     return content(chapter, { memory: { ...memory, chapters } });
   }
 );
@@ -151,12 +163,15 @@ const slug = (s: string) =>
 /* -------------------------------------------------------------------------- */
 
 export async function runBookAgent(prompt: string, outPath?: string) {
-  const memory: BookMemory = { prompt };
+  // decide output filename and clear it up front
+  const tmpPath = outPath ?? `${slug(prompt)}.md`;
+  await writeFile(tmpPath, "", "utf8");
+  const memory: BookMemory = { prompt, path: tmpPath };
   const init: AgentState<BookMemory> = {
     model: new ChatModel(MistralSmall),
     messages: [
       SystemMessage(
-        `You are BookWriterGPT. Never ask the user any question. Use \"create_outline\" once, then \"write_chapter\" for each chapter in order. When every chapter is written, reply DONE.`
+        `You are BookWriterGPT. Never ask the user any question. First call "create_outline", then for each chapter call "write_chapter" with JSON {"chapter_number":<1-based>} – when you’ve written them all, reply DONE.`
       ),
       UserMessage(prompt)
     ],
