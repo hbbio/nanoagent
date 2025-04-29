@@ -323,6 +323,7 @@ export class Sequence<Memory extends ChatMemory> {
         ...nextCtx,
         getUserInput: nextCtx.getUserInput ?? preserved
       };
+      // @todo preserve yesModel?
       const mergedOpts: SequenceOptions = { ...this.options, ...nextOpts };
 
       if (this.options.debug)

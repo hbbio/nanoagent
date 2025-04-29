@@ -3,6 +3,7 @@ import {
   AssistantMessage,
   type CompletionRequest,
   type Message,
+  type ToolCall,
   callToolAndAppend
 } from "./message";
 import { type ChatMemory, type Tools, toolList } from "./tool";
@@ -28,16 +29,21 @@ const mistralSmall = "mistral-small3.1";
 const llama32 = "llama3.2";
 const gemma3 = "gemma3:4b-it-qat";
 const gemma3mid = "gemma3:27b-it-qat";
+const qwen3_06b = "qwen3:0.6b";
 
 const gpt4o = "gpt-4o";
 const gpt41 = "gpt-4.1";
 const gpt41mini = "gpt-4.1-mini";
 const gpt41nano = "gpt-4.1-nano";
 
-export const ollama = (name: string): ChatModelOptions => ({
+export const ollama = (
+  name: string,
+  options?: Partial<ChatModelOptions>
+): ChatModelOptions => ({
   url: OLLAMA_URL,
   name,
-  stringifyContent: true
+  stringifyContent: true,
+  ...options
 });
 
 export const chatgpt = (name: string): ChatModelOptions => ({
@@ -51,6 +57,7 @@ export const Llama32 = ollama(llama32);
 export const Gemma3Small = ollama(gemma3);
 export const Gemma3Mid = ollama(gemma3mid);
 export const MistralSmall = ollama(mistralSmall);
+export const Qwen3Tiny = ollama(qwen3_06b, { removeThink: true });
 
 export const ChatGPT4o = chatgpt(gpt4o);
 export const ChatGPT41 = chatgpt(gpt41);
@@ -92,7 +99,19 @@ export interface ChatModelOptions {
   stringifyContent?: boolean;
   /** Override temperature for all messages */
   temperature?: number;
+  /** Remove thinking */
+  removeThink?: boolean;
 }
+
+// @todo move to content?
+export const removeThinkSection = (input: string): string => {
+  const start = input.indexOf("<think>");
+  const end = input.lastIndexOf("</think>");
+
+  if (start === -1 || end === -1 || end < start) return input.trim();
+
+  return (input.slice(0, start) + input.slice(end + "</think>".length)).trim();
+};
 
 /**
  * Default message‑adder: simply appends the assistant message to the history.
@@ -161,12 +180,29 @@ export class ChatModel implements Model {
     }));
   }
 
+  private _finalize(raw: {
+    message?: AssistantMessage | { content: string; tool_calls?: ToolCall[] };
+  }) {
+    if (!raw.message) throw new Error("no message");
+    const message = AssistantMessage(
+      this._options.removeThink &&
+        raw.message?.content &&
+        typeof raw.message.content === "string"
+        ? removeThinkSection(raw.message.content)
+        : raw.message.content,
+      raw.message?.tool_calls
+    );
+    return { message };
+  }
+
   /**
    * Execute a chat completion request and return the provider's raw payload.
    * Streaming responses are concatenated into a single JSON object containing
    * the final assistant message.
    */
-  async invoke(chat: CompletionRequest): Promise<{ message: Message }> {
+  async invoke(
+    chat: CompletionRequest
+  ): Promise<{ message: AssistantMessage }> {
     if (this.abortCtl) this.abortCtl.abort();
     this.abortCtl = new AbortController();
 
@@ -193,8 +229,12 @@ export class ChatModel implements Model {
 
     if (!this.stream) {
       this.abortCtl = null;
-      // @todo convert?
-      return res.json() as Promise<{ message: Message }>;
+      const raw = (await res.json()) as {
+        message:
+          | AssistantMessage
+          | { content: string; tool_calls?: ToolCall[] };
+      };
+      return this._finalize(raw);
     }
 
     // biome-ignore lint/style/noNonNullAssertion: res.ok
@@ -218,7 +258,8 @@ export class ChatModel implements Model {
     // biome-ignore lint/style/noNonNullAssertion: lines.length > 0
     const last = lines[lines.length - 1]!;
     const jsonLine = last.startsWith("data:") ? last.slice(5) : last;
-    return { message: JSON.parse(jsonLine).message as Message };
+    const raw = JSON.parse(jsonLine);
+    return this._finalize(raw);
   }
 
   /** Build a provider‑specific completion request.  */
@@ -241,14 +282,8 @@ export class ChatModel implements Model {
     memory: Memory = {} as Memory,
     tools?: Tools<Memory>
   ) {
-    const { message: assistantRaw } = await this.invoke(
-      await this.makeRequest(input, tools)
-    );
-    const assistant = AssistantMessage(
-      assistantRaw.content,
-      (assistantRaw as AssistantMessage).tool_calls
-    );
-    const merged = await this.adder(input, assistant);
+    const { message } = await this.invoke(await this.makeRequest(input, tools));
+    const merged = await this.adder(input, message);
     return callToolAndAppend(merged, memory, tools);
   }
 

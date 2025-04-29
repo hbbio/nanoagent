@@ -83,7 +83,7 @@ export const AssistantMessage = (
   tool_calls?: ToolCall[]
 ): AssistantMessage => ({
   role: "assistant",
-  content: typeof c === "string" ? text(c) : c,
+  content: toContent(c),
   ...(tool_calls ? { tool_calls } : {})
 });
 

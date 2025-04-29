@@ -45,6 +45,7 @@ export {
   Llama32,
   MistralSmall,
   ollama,
+  Qwen3Tiny,
   type ChatMessageAdder,
   type ChatModelOptions,
   type Model
