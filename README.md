@@ -237,7 +237,7 @@ Provide your own logger via `options.logger`.
 Contributions are welcome: Obviously make sure that all tests pass and that
 coverage includes your new code and feel free to submit PRs.
 
-I will clarify the coding style guidelines, but try to respect the current
-project style. Please keep no dependencies!
+Please follow the [coding guidelines](./CODING_GUIDELINES.md) and keep the
+project free of extra dependencies.
 
-Written by Henri Binsztok and release under the MIT license.
+Written by Henri Binsztok and released under the MIT license.
