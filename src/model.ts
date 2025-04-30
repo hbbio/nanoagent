@@ -30,6 +30,7 @@ const llama32 = "llama3.2";
 const gemma3 = "gemma3:4b-it-qat";
 const gemma3mid = "gemma3:27b-it-qat";
 const qwen3_06b = "qwen3:0.6b";
+const qwen3_4b = "qwen3:4b";
 
 const gpt4o = "gpt-4o";
 const gpt41 = "gpt-4.1";
@@ -58,6 +59,8 @@ export const Gemma3Small = ollama(gemma3);
 export const Gemma3Mid = ollama(gemma3mid);
 export const MistralSmall = ollama(mistralSmall);
 export const Qwen3Tiny = ollama(qwen3_06b, { removeThink: true });
+export const Qwen3TinyThink = ollama(qwen3_06b);
+export const Qwen3Small = ollama(qwen3_4b, { removeThink: true });
 
 export const ChatGPT4o = chatgpt(gpt4o);
 export const ChatGPT41 = chatgpt(gpt41);
