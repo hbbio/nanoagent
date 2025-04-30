@@ -188,9 +188,14 @@ export class ChatModel implements Model {
 
   private _formatMessages(messages: Message[]) {
     if (!this.options.stringifyContent) return messages;
-    return messages.map((msg) => ({
+    return messages.map((msg, i) => ({
       ...msg,
-      content: msg.content ? toText(msg.content) : null
+      content: msg.content
+        ? toText(msg.content) +
+          (i === messages.length - 1 && this.options?.removeThink
+            ? this.options?.noThinkPrompt || ""
+            : "")
+        : null
     }));
   }
 

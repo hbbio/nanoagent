@@ -40,10 +40,7 @@ export const answerIsYes =
   async (content: string | Content | null) => {
     if (!content) throw new Error("no content");
     const { messages } = await model.complete([
-      SystemMessage(
-        guidelines +
-          (model?.options?.removeThink ? model.options.noThinkPrompt : "")
-      ),
+      SystemMessage(guidelines),
       UserMessage(content)
     ]);
     // console.log("answerIsYes", { messages });
