@@ -176,7 +176,7 @@ export class ChatModel implements Model {
   private readonly adder: ChatMessageAdder;
   private abortCtl: AbortController | null = null;
 
-  constructor({ adder, ...opts }: ChatModelOptions = MistralSmall) {
+  constructor({ adder, ...opts }: ChatModelOptions = Qwen3Small) {
     this.options = opts;
     const { url, name, key, stream } = opts;
     this.url = url;
