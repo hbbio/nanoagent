@@ -157,8 +157,8 @@ export interface Model {
  */
 export class ChatModel implements Model {
   readonly name: string;
+  readonly options: ChatModelOptions;
 
-  private readonly _options: ChatModelOptions;
   private readonly url: string;
   private readonly key?: string;
   private readonly stream: boolean;
@@ -166,7 +166,7 @@ export class ChatModel implements Model {
   private abortCtl: AbortController | null = null;
 
   constructor({ adder, ...opts }: ChatModelOptions = MistralSmall) {
-    this._options = opts;
+    this.options = opts;
     const { url, name, key, stream } = opts;
     this.url = url;
     this.name = name;
@@ -176,7 +176,7 @@ export class ChatModel implements Model {
   }
 
   private _formatMessages(messages: Message[]) {
-    if (!this._options.stringifyContent) return messages;
+    if (!this.options.stringifyContent) return messages;
     return messages.map((msg) => ({
       ...msg,
       content: msg.content ? toText(msg.content) : null
@@ -188,7 +188,7 @@ export class ChatModel implements Model {
   }) {
     if (!raw.message) throw new Error("no message");
     const message = AssistantMessage(
-      this._options.removeThink &&
+      this.options.removeThink &&
         raw.message?.content &&
         typeof raw.message.content === "string"
         ? removeThinkSection(raw.message.content)
@@ -219,7 +219,7 @@ export class ChatModel implements Model {
       headers,
       body: JSON.stringify({
         ...chat,
-        temperature: chat.temperature ?? this._options.temperature ?? undefined,
+        temperature: chat.temperature ?? this.options.temperature ?? undefined,
         messages: this._formatMessages(chat.messages)
       } as CompletionRequest),
       signal: this.abortCtl.signal
