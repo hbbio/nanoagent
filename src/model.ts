@@ -8,10 +8,12 @@ import {
 } from "./message";
 import { type ChatMemory, type Tools, toolList } from "./tool";
 
+const isNode = typeof process !== "undefined" && !!process.versions?.node;
+
+/** Ollama */
+
 const OLLAMA_DEFAULT_ORIGIN = "http://localhost:11434";
 const OLLAMA_PATH = "/api/chat";
-
-const isNode = typeof process !== "undefined" && !!process.versions?.node;
 
 export const OLLAMA_URL = (() => {
   let origin = OLLAMA_DEFAULT_ORIGIN;
@@ -23,20 +25,6 @@ export const OLLAMA_URL = (() => {
   return `${origin}${OLLAMA_PATH}`;
 })();
 
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-
-const mistralSmall = "mistral-small3.1";
-const llama32 = "llama3.2";
-const gemma3 = "gemma3:4b-it-qat";
-const gemma3mid = "gemma3:27b-it-qat";
-const qwen3_06b = "qwen3:0.6b";
-const qwen3_4b = "qwen3:4b";
-
-const gpt4o = "gpt-4o";
-const gpt41 = "gpt-4.1";
-const gpt41mini = "gpt-4.1-mini";
-const gpt41nano = "gpt-4.1-nano";
-
 export const ollama = (
   name: string,
   options?: Partial<ChatModelOptions>
@@ -47,6 +35,31 @@ export const ollama = (
   ...options
 });
 
+const mistralSmall = "mistral-small3.1";
+export const MistralSmall = ollama(mistralSmall);
+
+const llama32 = "llama3.2";
+export const Llama32 = ollama(llama32);
+
+const gemma3 = "gemma3:4b-it-qat";
+const gemma3mid = "gemma3:27b-it-qat";
+export const Gemma3Small = ollama(gemma3);
+export const Gemma3Mid = ollama(gemma3mid);
+
+const qwen3_06b = "qwen3:0.6b";
+const qwen3_4b = "qwen3:4b";
+const qwen3NoThink: Partial<ChatModelOptions> = {
+  removeThink: true,
+  noThinkPrompt: "\n\n/nothink"
+};
+export const Qwen3Tiny = ollama(qwen3_06b, qwen3NoThink);
+export const Qwen3TinyThink = ollama(qwen3_06b);
+export const Qwen3Small = ollama(qwen3_4b, qwen3NoThink);
+
+/** OpenAI */
+
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
 export const chatgpt = (name: string): ChatModelOptions => ({
   url: OPENAI_URL,
   name,
@@ -54,14 +67,10 @@ export const chatgpt = (name: string): ChatModelOptions => ({
   stringifyArguments: true
 });
 
-export const Llama32 = ollama(llama32);
-export const Gemma3Small = ollama(gemma3);
-export const Gemma3Mid = ollama(gemma3mid);
-export const MistralSmall = ollama(mistralSmall);
-export const Qwen3Tiny = ollama(qwen3_06b, { removeThink: true });
-export const Qwen3TinyThink = ollama(qwen3_06b);
-export const Qwen3Small = ollama(qwen3_4b, { removeThink: true });
-
+const gpt4o = "gpt-4o";
+const gpt41 = "gpt-4.1";
+const gpt41mini = "gpt-4.1-mini";
+const gpt41nano = "gpt-4.1-nano";
 export const ChatGPT4o = chatgpt(gpt4o);
 export const ChatGPT41 = chatgpt(gpt41);
 export const ChatGPT41Mini = chatgpt(gpt41mini);
@@ -104,6 +113,8 @@ export interface ChatModelOptions {
   temperature?: number;
   /** Remove thinking */
   removeThink?: boolean;
+  /** No thinking prompt */
+  noThinkPrompt?: string;
 }
 
 // @todo move to content?
