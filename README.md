@@ -234,8 +234,8 @@ Provide your own logger via `options.logger`.
 
 ## Contributing and License
 
-Contributions are welcome: Obviously make sure that all tests pass and that
-coverage includes your new code and feel free to submit PRs.
+Contributions are welcome: Make sure that all tests pass and that coverage
+includes your new code and feel free to submit PRs.
 
 Please follow the [coding guidelines](./CODING_GUIDELINES.md) and keep the
 project free of extra dependencies.
