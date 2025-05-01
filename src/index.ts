@@ -45,13 +45,16 @@ export {
   Llama32,
   MistralSmall,
   ollama,
+  Qwen3Small,
   Qwen3Tiny,
+  Qwen3TinyThink,
   type ChatMessageAdder,
   type ChatModelOptions,
   type Model
 } from "./model";
 export {
   applySchema,
+  typedSchema,
   type JSONSchemaArray,
   type JSONSchemaObject,
   type JSONSchemaPrimitive,

@@ -8,10 +8,12 @@ import {
 } from "./message";
 import { type ChatMemory, type Tools, toolList } from "./tool";
 
+const isNode = typeof process !== "undefined" && !!process.versions?.node;
+
+/** Ollama */
+
 const OLLAMA_DEFAULT_ORIGIN = "http://localhost:11434";
 const OLLAMA_PATH = "/api/chat";
-
-const isNode = typeof process !== "undefined" && !!process.versions?.node;
 
 export const OLLAMA_URL = (() => {
   let origin = OLLAMA_DEFAULT_ORIGIN;
@@ -23,19 +25,6 @@ export const OLLAMA_URL = (() => {
   return `${origin}${OLLAMA_PATH}`;
 })();
 
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-
-const mistralSmall = "mistral-small3.1";
-const llama32 = "llama3.2";
-const gemma3 = "gemma3:4b-it-qat";
-const gemma3mid = "gemma3:27b-it-qat";
-const qwen3_06b = "qwen3:0.6b";
-
-const gpt4o = "gpt-4o";
-const gpt41 = "gpt-4.1";
-const gpt41mini = "gpt-4.1-mini";
-const gpt41nano = "gpt-4.1-nano";
-
 export const ollama = (
   name: string,
   options?: Partial<ChatModelOptions>
@@ -46,6 +35,31 @@ export const ollama = (
   ...options
 });
 
+const mistralSmall = "mistral-small3.1";
+export const MistralSmall = ollama(mistralSmall);
+
+const llama32 = "llama3.2";
+export const Llama32 = ollama(llama32);
+
+const gemma3 = "gemma3:4b-it-qat";
+const gemma3mid = "gemma3:27b-it-qat";
+export const Gemma3Small = ollama(gemma3);
+export const Gemma3Mid = ollama(gemma3mid);
+
+const qwen3_06b = "qwen3:0.6b";
+const qwen3_4b = "qwen3:4b";
+const qwen3NoThink: Partial<ChatModelOptions> = {
+  removeThink: true,
+  noThinkPrompt: "\n\n/nothink"
+};
+export const Qwen3Tiny = ollama(qwen3_06b, qwen3NoThink);
+export const Qwen3TinyThink = ollama(qwen3_06b);
+export const Qwen3Small = ollama(qwen3_4b, qwen3NoThink);
+
+/** OpenAI */
+
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+
 export const chatgpt = (name: string): ChatModelOptions => ({
   url: OPENAI_URL,
   name,
@@ -53,12 +67,10 @@ export const chatgpt = (name: string): ChatModelOptions => ({
   stringifyArguments: true
 });
 
-export const Llama32 = ollama(llama32);
-export const Gemma3Small = ollama(gemma3);
-export const Gemma3Mid = ollama(gemma3mid);
-export const MistralSmall = ollama(mistralSmall);
-export const Qwen3Tiny = ollama(qwen3_06b, { removeThink: true });
-
+const gpt4o = "gpt-4o";
+const gpt41 = "gpt-4.1";
+const gpt41mini = "gpt-4.1-mini";
+const gpt41nano = "gpt-4.1-nano";
 export const ChatGPT4o = chatgpt(gpt4o);
 export const ChatGPT41 = chatgpt(gpt41);
 export const ChatGPT41Mini = chatgpt(gpt41mini);
@@ -101,6 +113,8 @@ export interface ChatModelOptions {
   temperature?: number;
   /** Remove thinking */
   removeThink?: boolean;
+  /** No thinking prompt */
+  noThinkPrompt?: string;
 }
 
 // @todo move to content?
@@ -154,16 +168,16 @@ export interface Model {
  */
 export class ChatModel implements Model {
   readonly name: string;
+  readonly options: ChatModelOptions;
 
-  private readonly _options: ChatModelOptions;
   private readonly url: string;
   private readonly key?: string;
   private readonly stream: boolean;
   private readonly adder: ChatMessageAdder;
   private abortCtl: AbortController | null = null;
 
-  constructor({ adder, ...opts }: ChatModelOptions = MistralSmall) {
-    this._options = opts;
+  constructor({ adder, ...opts }: ChatModelOptions = Qwen3Small) {
+    this.options = opts;
     const { url, name, key, stream } = opts;
     this.url = url;
     this.name = name;
@@ -173,10 +187,15 @@ export class ChatModel implements Model {
   }
 
   private _formatMessages(messages: Message[]) {
-    if (!this._options.stringifyContent) return messages;
-    return messages.map((msg) => ({
+    if (!this.options.stringifyContent) return messages;
+    return messages.map((msg, i) => ({
       ...msg,
-      content: msg.content ? toText(msg.content) : null
+      content: msg.content
+        ? toText(msg.content) +
+          (i === messages.length - 1 && this.options?.removeThink
+            ? this.options?.noThinkPrompt || ""
+            : "")
+        : null
     }));
   }
 
@@ -185,7 +204,7 @@ export class ChatModel implements Model {
   }) {
     if (!raw.message) throw new Error("no message");
     const message = AssistantMessage(
-      this._options.removeThink &&
+      this.options.removeThink &&
         raw.message?.content &&
         typeof raw.message.content === "string"
         ? removeThinkSection(raw.message.content)
@@ -216,7 +235,7 @@ export class ChatModel implements Model {
       headers,
       body: JSON.stringify({
         ...chat,
-        temperature: chat.temperature ?? this._options.temperature ?? undefined,
+        temperature: chat.temperature ?? this.options.temperature ?? undefined,
         messages: this._formatMessages(chat.messages)
       } as CompletionRequest),
       signal: this.abortCtl.signal
