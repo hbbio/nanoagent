@@ -13,9 +13,9 @@ current directory and prints each chapter to stdout as it is generated.
 import {
   type AgentContext,
   type AgentState,
+  type ChatMemory,
   ChatModel,
-  Gemma3Small,
-  MistralSmall,
+  Qwen3Small,
   SystemMessage,
   ToolRegistry,
   UserMessage,
@@ -43,14 +43,14 @@ interface Chapter {
   content: string;
 }
 
-export interface BookMemory {
+export type BookMemory = ChatMemory & {
   prompt: string;
   /** where to write incremental output */
   path?: string;
   title?: string;
   outline?: ChapterOutline[];
   chapters?: Chapter[];
-}
+};
 
 /* -------------------------------------------------------------------------- */
 /* create_outline tool                                                         */
@@ -68,8 +68,9 @@ const createOutline = tool(
     },
     required: ["topic", "audience", "chapters"]
   }),
-  async ({ topic, audience, chapters }, memory) => {
-    const model = new ChatModel(MistralSmall);
+  async ({ topic, audience, chapters }, memory: BookMemory) => {
+    console.log({ topic, audience, chapters });
+    const model = new ChatModel(Qwen3Small);
     const sys = SystemMessage(
       "You are an expert book architect. Output ONLY raw JSON array of {title,summary}. Never ask any question or request input."
     );
@@ -80,11 +81,13 @@ const createOutline = tool(
     const last = messages[messages.length - 1];
     let outline: ChapterOutline[] = [];
     try {
-      outline = JSON.parse(toText(last.content) ?? "[]");
+      outline = JSON.parse(toText(last?.content) ?? "[]");
     } catch {
       /* keep outline empty – agent loop will retry or halt */
     }
-    return content(outline, { memory: { ...memory, outline } });
+    console.log({ outline });
+    // process.exit(0);
+    return content(outline, { memPatch: (memory) => ({ ...memory, outline }) });
   }
 );
 
@@ -96,21 +99,27 @@ const writeChapter = tool(
   "write_chapter",
   "Write the prose of a given chapter number (1-based).",
   // now accepts { chapter_number: number } (and will ignore any extra 'title' field)
-  typedSchema<{ chapter_number: number; title?: string }>({
+  typedSchema<{
+    chapter_number: number;
+    // title?: string
+  }>({
     type: "object",
     properties: {
-      chapter_number: { type: "integer", minimum: 1 },
-      title: { type: "string" }
+      chapter_number: { type: "integer", minimum: 1 }
+      // title: { type: "string" }
     },
     required: ["chapter_number"]
   }),
-  async ({ chapter_number }, memory) => {
+  async ({ chapter_number }, memory: BookMemory) => {
+    console.log("write_chapter", { chapter_number, memory });
     // convert to zero-based index
     const index = chapter_number - 1;
     if (!memory.outline?.[index]) return content([]);
 
     const { title, summary } = memory.outline[index];
-    const model = new ChatModel(MistralSmall);
+    console.log("write_chapter", { chapter_number, title, summary });
+
+    const model = new ChatModel(Qwen3Small);
     const sys = SystemMessage(
       "You are a meticulous technical writer. Compose well-structured prose (~2500 words). Do NOT ask the reader any question and do NOT request feedback."
     );
@@ -118,9 +127,10 @@ const writeChapter = tool(
       `Write chapter ${chapter_number}: "${title}" – ${summary}.`
     );
     const { messages } = await model.complete([sys, user]);
-    const prose = toText(messages[messages.length - 1].content) ?? "";
+    const prose = toText(messages[messages.length - 1]?.content) ?? "";
 
     const chapter: Chapter = { index, title, content: prose };
+    console.log({ chapter });
     // replace any existing chapter at this index
     const chapters = (memory.chapters ?? []).filter((c) => c.index !== index);
     chapters.push(chapter);
@@ -130,26 +140,16 @@ const writeChapter = tool(
     if (memory.path) {
       await appendFile(memory.path, snippet, "utf8");
     }
-    return content(chapter, { memory: { ...memory, chapters } });
+    // @todo use immer
+    return content(chapter, {
+      memPatch: (memory) => ({ ...memory, chapters })
+    });
   }
 );
 
 /* -------------------------------------------------------------------------- */
 /* Agent context & utilities                                                   */
 /* -------------------------------------------------------------------------- */
-
-const makeContext = (): AgentContext<BookMemory> => ({
-  registry: new ToolRegistry({
-    create_outline: createOutline,
-    write_chapter: writeChapter
-  }),
-  isFinal: async ({ memory }) =>
-    !!memory.outline &&
-    !!memory.chapters &&
-    memory.chapters.length === memory.outline.length,
-  guidelines: async ({ chapters, outline }) =>
-    `You are BookWriterGPT. Never ask the user for anything. Current progress: ${chapters?.length ?? 0}/${outline?.length ?? "?"} chapters.`
-});
 
 /* slugify helper */
 const slug = (s: string) =>
@@ -168,7 +168,7 @@ export async function runBookAgent(prompt: string, outPath?: string) {
   await writeFile(tmpPath, "", "utf8");
   const memory: BookMemory = { prompt, path: tmpPath };
   const init: AgentState<BookMemory> = {
-    model: new ChatModel(MistralSmall),
+    model: new ChatModel(Qwen3Small),
     messages: [
       SystemMessage(
         `You are BookWriterGPT. Never ask the user any question. First call "create_outline", then for each chapter call "write_chapter" with JSON {"chapter_number":<1-based>} – when you’ve written them all, reply DONE.`
@@ -177,12 +177,24 @@ export async function runBookAgent(prompt: string, outPath?: string) {
     ],
     memory
   };
+  const ctx = {
+    registry: new ToolRegistry<BookMemory>({
+      create_outline: createOutline,
+      write_chapter: writeChapter
+    }),
+    isFinal: async ({ memory }) =>
+      !!memory?.outline &&
+      !!memory.chapters &&
+      memory.chapters.length === memory.outline.length,
+    guidelines: async ({ chapters, outline }) =>
+      `You are BookWriterGPT. Never ask the user for anything. Current progress: ${chapters?.length ?? 0}/${outline?.length ?? "?"} chapters.`
+  } as AgentContext<BookMemory>;
 
-  const yesModel = new ChatModel(Gemma3Small);
-  const final = await loopAgent(makeContext(), init, {
-    yesModel,
-    maxSteps: 200,
-    debug: true
+  const yesModel = new ChatModel(Qwen3Small);
+  const final = await loopAgent(ctx, init, {
+    yesModel, // @todo in context?
+    maxSteps: 200
+    // debug: true
   });
 
   const { outline, chapters } = final.memory;
