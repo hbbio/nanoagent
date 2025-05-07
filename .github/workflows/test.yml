@@ -1,0 +1,59 @@
+name: Test with Ollama and Upload Coverage
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Cache Ollama model store
+        uses: actions/cache@v3
+        with:
+          path: ~/.ollama/models
+          key: ollama-models-${{ runner.os }}-${{ hashFiles('**/ollama-models-version.txt') }}
+          restore-keys: |
+            ollama-models-${{ runner.os }}-
+
+      - name: Install Ollama
+        run: |
+          curl -fsSL https://ollama.com/download/Ollama-linux-amd64.tgz -o ollama.tgz
+          tar -xzf ollama.tgz
+          sudo mv ollama /usr/local/bin/ollama
+          sudo chmod +x /usr/local/bin/ollama
+
+      - name: Start Ollama in background
+        run: |
+          nohup ollama serve > /dev/null 2>&1 &
+          sleep 5
+
+      - name: Pull model (mistral)
+        run: ollama pull mistral
+
+      - name: Run Ollama test inference
+        run: |
+          ollama run mistral -p "Say hello" | tee result.txt
+          grep -iq "hello" result.txt
+
+      - name: Run Bun tests with coverage
+        run: bun test --coverage --coverage-reporter=lcov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          fail_ci_if_error: true
