@@ -1,4 +1,9 @@
-import type { ChatMemory, ToolRegistry } from "./tool";
+import {
+  type ChatMemory,
+  type ChatMemoryPatch,
+  ContentMemoryNonSerializablePatch,
+  type ToolRegistry
+} from "./tool";
 
 // cf. https://bun.sh/docs/api/http
 export const serveMCP = <Memory extends ChatMemory>(
@@ -23,7 +28,12 @@ export const serveMCP = <Memory extends ChatMemory>(
             memory: Memory;
           };
           const result = await toolRegistry.call(name, input, memory);
-          return Response.json(result);
+          const nextMem = result[ContentMemoryNonSerializablePatch]
+            ? (result[ContentMemoryNonSerializablePatch] as ChatMemoryPatch)(
+                memory
+              )
+            : memory;
+          return Response.json({ ...result, memory: nextMem });
         } catch (err) {
           console.error("Error in tool-call:", err);
           return new Response(JSON.stringify({ error: String(err) }), {

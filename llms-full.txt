@@ -100,7 +100,6 @@ export type Tool = {
 };
 
 export const ContentJSON                    = "x-content";
-export const ContentMemory                  = "x-memory";
 export const ContentMemoryLambdascriptPatch = "x-memLambda";
 export const ContentMemoryNonSerializablePatch = "x-memPatch";
 
@@ -108,7 +107,6 @@ export type ToolCallResponse<M extends ChatMemory,Out> = {
   content?: readonly Content[];
   error?  : string;
   [typeof ContentJSON]?: Out;
-  [typeof ContentMemory]?: M;
   [typeof ContentMemoryLambdascriptPatch]?: string;
   [typeof ContentMemoryNonSerializablePatch]?: ChatMemoryPatch;
 };
