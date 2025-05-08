@@ -36,9 +36,9 @@ export type ChatMemoryPatch = <M extends ChatMemory>(state: M) => M;
 
 /** MCP extension header fields. */
 export const ContentJSON = "x-content";
-export const ContentMemoryLambdascriptPatch = "x-memLambda";
 export const ContentMemoryNonSerializablePatch = "x-memPatch";
-export const ContentMemory = "x-memory";
+/** Reserved key for future extension. */
+export const ContentMemoryLambdascriptPatch = "x-memLambda";
 
 /** Response returned by a {@link ToolHandler}. */
 export type ToolCallResponse<Memory extends ChatMemory, Out> = {
@@ -48,8 +48,6 @@ export type ToolCallResponse<Memory extends ChatMemory, Out> = {
   error?: string;
   /** Structured output for providers lacking `content`. */
   [ContentJSON]?: Out;
-  /** Snapshot replacement. */
-  [ContentMemory]?: Memory;
   /** Lambdascript program to mutate memory. */
   [ContentMemoryLambdascriptPatch]?: string;
   /** Internal non‑serialisable mutation. */
@@ -69,7 +67,6 @@ const buildMeta = <Memory extends ChatMemory>({
   memory,
   memPatch
 }: ToolContentOptions<Memory> = {}) => ({
-  ...(memory ? { [ContentMemory]: memory } : {}),
   ...(memPatch ? { [ContentMemoryNonSerializablePatch]: memPatch } : {})
 });
 
@@ -228,10 +225,6 @@ export class ToolRegistry<Memory extends ChatMemory> {
     const entry = this._tools[name];
     if (!entry) throw new Error(`Tool \"${name}\" not found`);
     const { handler } = typeof entry === "function" ? await entry() : entry;
-    const res = await handler(args, memory);
-    const nextMem = res[ContentMemoryNonSerializablePatch]
-      ? (res[ContentMemoryNonSerializablePatch] as ChatMemoryPatch)(memory)
-      : (res[ContentMemory] ?? memory);
-    return { ...res, [ContentMemory]: nextMem };
+    return handler(args, memory);
   }
 }
