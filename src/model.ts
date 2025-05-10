@@ -56,6 +56,24 @@ export const Qwen3Tiny = ollama(qwen3_06b, qwen3NoThink);
 export const Qwen3TinyThink = ollama(qwen3_06b);
 export const Qwen3Small = ollama(qwen3_4b, qwen3NoThink);
 
+/** LM Studio */
+
+const LMS_DEFAULT_ORIGIN = "http://localhost:1234";
+const LMS_PATH = "/v1/chat/completions";
+
+export const lms = (
+  name: string,
+  options?: Partial<ChatModelOptions>
+): ChatModelOptions => ({
+  url: LMS_DEFAULT_ORIGIN + LMS_PATH,
+  name,
+  stringifyContent: true,
+  ...options
+});
+
+const qwen3_14b_mlx = "qwen3-14b-mlx";
+export const Qwen3MidMLX = lms(qwen3_14b_mlx, qwen3NoThink);
+
 /** OpenAI */
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
@@ -199,17 +217,35 @@ export class ChatModel implements Model {
     }));
   }
 
-  private _finalize(raw: {
-    message?: AssistantMessage | { content: string; tool_calls?: ToolCall[] };
-  }) {
-    if (!raw.message) throw new Error("no message");
+  private _finalize(
+    raw:
+      | {
+          message?:
+            | AssistantMessage
+            | { content: string; tool_calls?: ToolCall[] };
+        }
+      | { choices: AssistantMessage[] }
+  ) {
+    const msg =
+      "message" in raw && raw.message && "content" in raw.message
+        ? raw.message
+        : "choices" in raw &&
+            Array.isArray(raw.choices) &&
+            raw.choices?.length &&
+            // @todo support multiple choices
+            raw.choices[0] &&
+            "message" in raw.choices[0]
+          ? (raw.choices[0].message as AssistantMessage)
+          : null;
+    if (!msg) {
+      console.log({ raw });
+      throw new Error("no message");
+    }
     const message = AssistantMessage(
-      this.options.removeThink &&
-        raw.message?.content &&
-        typeof raw.message.content === "string"
-        ? removeThinkSection(raw.message.content)
-        : raw.message.content,
-      raw.message?.tool_calls
+      this.options.removeThink && typeof msg.content === "string"
+        ? removeThinkSection(msg.content)
+        : msg.content || "",
+      msg?.tool_calls
     );
     return { message };
   }
