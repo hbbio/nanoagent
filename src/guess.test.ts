@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { textIncludes } from "./content";
 import { SystemMessage, UserMessage } from "./message";
-import { ChatModel } from "./model";
+import { ChatModel, Qwen3MidMLX } from "./model";
 import { ToolRegistry, content, error, tool } from "./tool";
 import { type AgentContext, type AgentState, loopAgent } from "./workflow";
 
@@ -81,8 +81,8 @@ const context: AgentContext<{ num?: number }> = {
   }
 };
 
-const initialState: AgentState<{ num?: number }> = {
-  model: new ChatModel(),
+const initialState = (model: ChatModel): AgentState<{ num?: number }> => ({
+  model,
   messages: [
     SystemMessage(
       "You're playing a game. First, use the `chooseNumber` tool to choose a secret number between 1 and 9 inclusive. Then you MUST use the `guessNumber` tool repeatedly to make guesses.❗ Never ask the user anything. Never say your guess out loud unless you're calling the tool. Never wait for a reply. Always guess by calling the `guessNumber` tool directly. Keep guessing until you win."
@@ -91,7 +91,7 @@ const initialState: AgentState<{ num?: number }> = {
     UserMessage("Now call the `chooseNumber` tool to get started")
   ],
   memory: {}
-};
+});
 
 /* -------------------------------------------------------------------------- */
 /* Test                                                                       */
@@ -99,9 +99,22 @@ const initialState: AgentState<{ num?: number }> = {
 
 describe("guessing game", () => {
   it(
-    "stores the number in memory and repeatedly makes guesses until success",
+    "stores the number in memory and repeatedly makes guesses until success (default model)",
     async () => {
-      const run = await loopAgent(context, initialState);
+      const run = await loopAgent(context, initialState(new ChatModel()));
+      console.log(run.messages);
+      expect(run.messages.length).toBeGreaterThan(4);
+    },
+    { timeout: 60_000 }
+  );
+
+  it(
+    "stores the number in memory and repeatedly makes guesses until success (Qwen3MidMLX)",
+    async () => {
+      const run = await loopAgent(
+        context,
+        initialState(new ChatModel(Qwen3MidMLX))
+      );
       console.log(run.messages);
       expect(run.messages.length).toBeGreaterThan(4);
     },

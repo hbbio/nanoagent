@@ -45,6 +45,7 @@ export {
   Llama32,
   MistralSmall,
   ollama,
+  Qwen3MidMLX,
   Qwen3Small,
   Qwen3Tiny,
   Qwen3TinyThink,

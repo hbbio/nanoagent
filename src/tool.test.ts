@@ -7,7 +7,7 @@ import {
   UserMessage,
   getToolArguments
 } from "./message";
-import { ChatModel, Llama32 } from "./model";
+import { ChatModel, Llama32, Qwen3MidMLX } from "./model";
 import { content, tool } from "./tool";
 
 const weatherTool = "get_current_weather";
@@ -74,8 +74,8 @@ describe("Weather tool", () => {
 describe("OpenAI tool call (raw HTTP)", () => {
   const tools = { [weatherTool]: getCurrentWeather };
 
-  it("should return a tool_call for get_current_weather", async () => {
-    const model = new ChatModel(Llama32);
+  it("should return a tool_call for get_current_weather (default)", async () => {
+    const model = new ChatModel();
     const { message } = (await model.invoke(
       await model.makeRequest(
         [UserMessage("What's the weather like in Tokyo in celsius?")],
@@ -90,16 +90,67 @@ describe("OpenAI tool call (raw HTTP)", () => {
 
     // console.log({ message });
     expect(tool?.name).toBe("get_current_weather");
-    const { location, format } = tool?.arguments as {
-      location: string;
-      format: string;
-    };
+    const { location, format } =
+      tool && "arguments" in tool
+        ? typeof tool.arguments === "object"
+          ? (tool?.arguments as {
+              location: string;
+              format: string;
+            })
+          : JSON.parse(tool.arguments)
+        : null;
     expect(location.toLowerCase()).toContain("tokyo");
     expect(format).toBe("celsius");
   }, 10_000); // 10s timeout
 
-  it("two round tool use", async () => {
+  it("should return a tool_call for get_current_weather (Qwen3MidMLX)", async () => {
+    const model = new ChatModel(Qwen3MidMLX);
+    const { message } = (await model.invoke(
+      await model.makeRequest(
+        [UserMessage("What's the weather like in Tokyo in celsius?")],
+        tools
+      )
+    )) as { message: AssistantMessage };
+    console.log(message?.tool_calls?.[0]);
+
+    expect(message).toBeTruthy();
+    const tool = message.tool_calls?.[0]?.function;
+    expect(tool).toBeTruthy();
+
+    // console.log({ message });
+    expect(tool?.name).toBe("get_current_weather");
+    const { location, format } =
+      tool && "arguments" in tool
+        ? typeof tool.arguments === "object"
+          ? (tool?.arguments as {
+              location: string;
+              format: string;
+            })
+          : JSON.parse(tool.arguments)
+        : null;
+    expect(location.toLowerCase()).toContain("tokyo");
+    expect(format).toBe("celsius");
+  }, 10_000); // 10s timeout
+
+  it("two round tool use (Llama32)", async () => {
     const model = new ChatModel(Llama32);
+    // call the chat and automatically call the tool
+    const input = [UserMessage("What's the weather like in Tokyo in celsius?")];
+    const { messages } = await model.complete(input, {}, tools);
+    expect(messages).toBeTruthy();
+    expect(messages.length).toBe(3);
+
+    // second round: call the LLM again
+    const final = await model.complete(messages); // no tools
+    expect(final).toBeTruthy();
+    expect(final.messages.length).toBe(4);
+    const content = toText(final?.messages?.[3]?.content)?.toLowerCase();
+    expect(content).toContain("tokyo");
+    expect(content).toContain("18");
+  }, 10_000); // 10s timeout
+
+  it("two round tool use (Qwen3MidMLX)", async () => {
+    const model = new ChatModel(Qwen3MidMLX);
     // call the chat and automatically call the tool
     const input = [UserMessage("What's the weather like in Tokyo in celsius?")];
     const { messages } = await model.complete(input, {}, tools);
