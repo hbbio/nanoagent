@@ -40,6 +40,7 @@ export {
   ChatGPT4o,
   ChatModel,
   defaultAdder,
+  Devstral,
   Gemma3Mid,
   Gemma3Small,
   Llama32,
