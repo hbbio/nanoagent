@@ -268,14 +268,16 @@ export class ChatModel implements Model {
     };
     if (this.key) headers.Authorization = `Bearer ${this.key}`;
 
+    const request = {
+      ...chat,
+      temperature: chat.temperature ?? this.options.temperature ?? undefined,
+      messages: this._formatMessages(chat.messages)
+    } as CompletionRequest;
+
     const res = await fetch(this.url, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        ...chat,
-        temperature: chat.temperature ?? this.options.temperature ?? undefined,
-        messages: this._formatMessages(chat.messages)
-      } as CompletionRequest),
+      body: JSON.stringify(request),
       signal: this.abortCtl.signal
     });
 
@@ -303,6 +305,7 @@ export class ChatModel implements Model {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+        // @todo update a Cell
         buffer += decoder.decode(value, { stream: true });
       }
       buffer += decoder.decode();
