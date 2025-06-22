@@ -83,7 +83,7 @@ const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 export const chatgpt = (name: string): ChatModelOptions => ({
   url: OPENAI_URL,
   name,
-  key: process?.env?.CHATGPT_KEY,
+  key: isNode ? process.env?.CHATGPT_KEY : undefined,
   stringifyArguments: true
 });
 
