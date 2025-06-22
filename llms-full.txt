@@ -315,7 +315,7 @@ export interface AgentContext<M extends ChatMemory> {
   isFinal: (st: AgentState<M>) => Promise<boolean>;
   registry?: ToolRegistry<M>;
   nextSequence?: (st: AgentState<M>) => Promise<{
-    ctx: AgentContext<M>; state: AgentState<M>; options?: SequenceOptions;
+    ctx: AgentContext<M>; state: AgentState<M>; options?: SequenceOptions<M>;
   }>;
   controller?: (st: AgentState<M>) => Promise<AgentState<M>>;
 }

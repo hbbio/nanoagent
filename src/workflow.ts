@@ -56,7 +56,7 @@ export type AgentState<Memory> = {
 };
 
 /** Config for one sequence run. */
-export interface SequenceOptions {
+export interface SequenceOptions<Memory extends ChatMemory> {
   /** Maximum number of additional model calls to perform. */
   maxSteps?: number;
   /** When true, the framework prints debug output via `logger`. */
@@ -67,6 +67,8 @@ export interface SequenceOptions {
   logger?: Pick<Console, "log" | "warn" | "error">;
   /** ChatModel used for agent loop management, e.g. does the assistant requires user input */
   yesModel: ChatModel;
+  /** Callback on state change */
+  onStateChange?: (state: AgentState<Memory>) => void;
 }
 
 /**
@@ -98,7 +100,7 @@ export interface AgentContext<Memory extends ChatMemory> {
   nextSequence?: (state: AgentState<Memory>) => Promise<{
     ctx: AgentContext<Memory>;
     state: AgentState<Memory>;
-    options?: SequenceOptions;
+    options?: SequenceOptions<Memory>;
   }>;
   /**
    * Recovery hook invoked when the loop detects that progress has stalled.
@@ -235,13 +237,14 @@ export const stepAgent = async <Memory extends ChatMemory>(
 export const loopAgent = async <Memory extends ChatMemory>(
   ctx: AgentContext<Memory>,
   initState: AgentState<Memory>,
-  options: SequenceOptions = { yesModel: new ChatModel(Gemma3Small) }
+  options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma3Small) }
 ): Promise<AgentState<Memory>> => {
   const logger = options.logger ?? console;
   let state = initState;
   let remaining = options.maxSteps ?? Number.POSITIVE_INFINITY;
 
   while (true) {
+    if (options?.onStateChange) options.onStateChange(state);
     if (
       state.halted?.kind === HaltKind.Done ||
       state.halted?.kind === HaltKind.Stopped
@@ -267,13 +270,13 @@ export const loopAgent = async <Memory extends ChatMemory>(
 export class Sequence<Memory extends ChatMemory> {
   private _ctx: AgentContext<Memory>;
   private _state: AgentState<Memory>;
-  private _options: SequenceOptions;
+  private _options: SequenceOptions<Memory>;
   private _logger: Pick<Console, "log" | "warn" | "error">;
 
   constructor(
     ctx: AgentContext<Memory>,
     state: AgentState<Memory>,
-    options: SequenceOptions = { yesModel: new ChatModel(Gemma3Small) }
+    options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma3Small) }
   ) {
     this._ctx = ctx;
     this._state = state;
@@ -292,7 +295,7 @@ export class Sequence<Memory extends ChatMemory> {
   };
 
   /** Snapshot current options. */
-  private get options(): SequenceOptions {
+  private get options(): SequenceOptions<Memory> {
     return this._options;
   }
 
@@ -324,7 +327,10 @@ export class Sequence<Memory extends ChatMemory> {
         getUserInput: nextCtx.getUserInput ?? preserved
       };
       // @todo preserve yesModel?
-      const mergedOpts: SequenceOptions = { ...this.options, ...nextOpts };
+      const mergedOpts: SequenceOptions<Memory> = {
+        ...this.options,
+        ...nextOpts
+      };
 
       if (this.options.debug)
         this._logger.log(`☎︎  Sequence → ${nextState.id ?? "-"}`);
