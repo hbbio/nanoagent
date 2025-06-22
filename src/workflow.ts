@@ -343,18 +343,24 @@ export class Sequence<Memory extends ChatMemory> {
   }
 }
 
+export type WorkflowOptions<Memory extends ChatMemory> = {
+  onSequenceChange?: (seq: Sequence<Memory>) => void;
+};
+
 /**
  * Execute a workflow composed of chained `Sequence` objects until no new
  * sequence is produced.  Returns both the final `AgentState` and the ordered
  * history of sequences for inspection / debugging.
  */
 export const runWorkflow = async <Memory extends ChatMemory>(
-  init: Sequence<Memory>
+  init: Sequence<Memory>,
+  options?: WorkflowOptions<Memory>
 ): Promise<{ final: AgentState<Memory>; history: Sequence<Memory>[] }> => {
   const history: Sequence<Memory>[] = [];
   let current = init;
 
   while (true) {
+    if (options?.onSequenceChange) options.onSequenceChange(current);
     history.push(current);
     const [next, state] = await current.next();
     if (next === current) return { final: state, history };
