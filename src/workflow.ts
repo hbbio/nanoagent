@@ -69,6 +69,8 @@ export interface SequenceOptions<Memory extends ChatMemory> {
   yesModel: ChatModel;
   /** Callback on state change */
   onStateChange?: (state: AgentState<Memory>) => void;
+  onStart?: (state: AgentState<Memory>) => void;
+  onStop?: (state: AgentState<Memory>) => void;
 }
 
 /**
@@ -254,11 +256,13 @@ export const loopAgent = async <Memory extends ChatMemory>(
     if (remaining === 0) {
       return { ...state, halted: { kind: HaltKind.Stopped } };
     }
+    if (options?.onStart) options.onStart(state);
     state = await stepAgent(ctx, state, {
       debug: options.debug,
       logger,
       yesModel: options.yesModel
     });
+    if (options?.onStop) options.onStop(state);
     remaining =
       remaining === Number.POSITIVE_INFINITY
         ? Number.POSITIVE_INFINITY
