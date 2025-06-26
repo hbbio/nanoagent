@@ -288,6 +288,10 @@ export class Sequence<Memory extends ChatMemory> {
     this._logger = options.logger ?? console;
   }
 
+  get messages() {
+    return this._state.messages;
+  }
+
   /** Replace the underlying state (e.g., after external persistence). */
   resetState = (state: AgentState<Memory>): void => {
     this._state = state;
