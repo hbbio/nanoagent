@@ -367,9 +367,12 @@ export const runWorkflow = async <Memory extends ChatMemory>(
   let current = init;
 
   while (true) {
-    if (options?.onSequenceChange) options.onSequenceChange(current);
     history.push(current);
     const [next, state] = await current.next();
+    current.resetState(state);
+
+    if (options?.onSequenceChange) options.onSequenceChange(current);
+
     if (next === current) return { final: state, history };
     current = next;
   }
