@@ -66,7 +66,7 @@ export interface SequenceOptions<Memory extends ChatMemory> {
   /** Structured logger – defaults to the global console object. */
   logger?: Pick<Console, "log" | "warn" | "error">;
   /** ChatModel used for agent loop management, e.g. does the assistant requires user input */
-  yesModel: ChatModel;
+  yesModel: Model;
   /** Callback on state change */
   onStateChange?: (state: AgentState<Memory>) => void;
   onStart?: (state: AgentState<Memory>) => void;
@@ -127,7 +127,7 @@ const hasTwoAssistantInRow = (messages: readonly Message[]) =>
 export interface StepOptions {
   debug?: boolean;
   logger?: Pick<Console, "log" | "warn" | "error">;
-  yesModel: ChatModel;
+  yesModel: Model;
 }
 
 /**
