@@ -37,6 +37,8 @@ export interface SystemMessage extends BaseMessage<"system"> {
 /** Human user message. */
 export interface UserMessage extends BaseMessage<"user"> {
   content: Content;
+  /** Is this generated for an agent step? */
+  fake?: boolean;
 }
 
 /** Assistant reply that may embed tool‑calls. */
