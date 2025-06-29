@@ -136,7 +136,7 @@ describe("OpenAI tool call (raw HTTP)", () => {
     const model = new ChatModel(Llama32);
     // call the chat and automatically call the tool
     const input = [UserMessage("What's the weather like in Tokyo in celsius?")];
-    const { messages } = await model.complete(input, {}, tools);
+    const { messages } = await model.complete(input, { tools });
     expect(messages).toBeTruthy();
     expect(messages.length).toBe(3);
 
@@ -153,7 +153,7 @@ describe("OpenAI tool call (raw HTTP)", () => {
     const model = new ChatModel(Qwen3MidMLX);
     // call the chat and automatically call the tool
     const input = [UserMessage("What's the weather like in Tokyo in celsius?")];
-    const { messages } = await model.complete(input, {}, tools);
+    const { messages } = await model.complete(input, { tools });
     expect(messages).toBeTruthy();
     expect(messages.length).toBe(3);
 

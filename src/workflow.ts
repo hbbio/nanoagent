@@ -180,11 +180,10 @@ export const stepAgent = async <Memory extends ChatMemory>(
   // Model (and tool) call
   let output: { messages: readonly Message[]; memory?: Memory };
   try {
-    output = await state.model.complete(
-      state.messages,
-      state.memory,
-      ctx.registry?.tools
-    );
+    output = await state.model.complete(state.messages, {
+      memory: state.memory,
+      tools: ctx.registry?.tools
+    });
   } catch (error) {
     const halted: AgentState<Memory> = {
       ...state,

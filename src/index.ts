@@ -52,6 +52,7 @@ export {
   Qwen3TinyThink,
   type ChatMessageAdder,
   type ChatModelOptions,
+  type CompleteOptions,
   type Model
 } from "./model";
 export {

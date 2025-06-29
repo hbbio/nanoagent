@@ -161,6 +161,13 @@ export const defaultAdder = async (
  */
 export type ChatMessageAdder = typeof defaultAdder;
 
+export type CompleteOptions<Memory extends ChatMemory> = {
+  memory?: Memory;
+  tools?: Tools<Memory>;
+  /** callback on streaming output */
+  onOutput?: (progress: string) => void;
+};
+
 /**
  * Minimal interface a model must implement to be usable by the agent loop.
  */
@@ -173,8 +180,7 @@ export interface Model {
    */
   complete: <Memory extends ChatMemory>(
     input: readonly Message[],
-    memory?: Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) => Promise<{ messages: readonly Message[]; memory: Memory }>;
   /** Abort an in‑flight streaming request. */
   stop: () => Promise<void>;
@@ -339,12 +345,17 @@ export class ChatModel implements Model {
   /** @inheritdoc */
   async complete<Memory extends ChatMemory>(
     input: readonly Message[],
-    memory: Memory = {} as Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) {
-    const { message } = await this.invoke(await this.makeRequest(input, tools));
+    const { message } = await this.invoke(
+      await this.makeRequest(input, options?.tools)
+    );
     const merged = await this.adder(input, message);
-    return callToolAndAppend(merged, memory, tools);
+    return callToolAndAppend(
+      merged,
+      options?.memory || ({} as Memory),
+      options?.tools
+    );
   }
 
   /** @inheritdoc */
