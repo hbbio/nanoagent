@@ -121,8 +121,6 @@ export interface ChatModelOptions {
   name: string;
   /** Optional bearer token used for `Authorization: Bearer …`. */
   key?: string;
-  /** When `true`, requests a chunked streaming response. */
-  stream?: boolean;
   /** Optional custom message‐adder used to merge assistant replies. */
   adder?: ChatMessageAdder;
   /** Tool arguments must be stringified (OpenAI) */
@@ -135,6 +133,12 @@ export interface ChatModelOptions {
   removeThink?: boolean;
   /** No thinking prompt */
   noThinkPrompt?: string;
+  /** When `true`, requests a chunked streaming response. */
+  stream?: boolean;
+  /** Optional function to decode SSE */
+  decodeSSE?: (event: string) => string;
+  /** Optional callback on SSE */
+  onSSE?: (decoded: string) => void;
 }
 
 // @todo move to content?
@@ -270,7 +274,7 @@ export class ChatModel implements Model {
     this._abortCtl = new AbortController();
 
     const headers: Record<string, string> = {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json; charset=utf-8"
     };
     if (this.key) headers.Authorization = `Bearer ${this.key}`;
 
@@ -311,21 +315,24 @@ export class ChatModel implements Model {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
-        // @todo update a Cell
-        buffer += decoder.decode(value, { stream: true });
+        const chunk = decoder.decode(value, { stream: true });
+        const decoded = this.options.decodeSSE
+          ? this.options.decodeSSE(chunk)
+          : chunk;
+        buffer += decoded;
+        if (this.options.onSSE) this.options.onSSE(decoded);
       }
       buffer += decoder.decode();
     } finally {
       this._abortCtl = null;
     }
 
-    const lines = buffer.trim().split(/\r?\n/).filter(Boolean);
-    if (!lines?.length) return { message: AssistantMessage("") };
-    // biome-ignore lint/style/noNonNullAssertion: lines.length > 0
-    const last = lines[lines.length - 1]!;
-    const jsonLine = last.startsWith("data:") ? last.slice(5) : last;
-    const raw = JSON.parse(jsonLine);
-    return this._finalize(raw);
+    try {
+      const obj = JSON.parse(buffer);
+      return this._finalize(obj);
+    } catch (err) {
+      return this._finalize({ message: AssistantMessage(buffer) });
+    }
   }
 
   /** Build a provider‑specific completion request.  */
