@@ -200,7 +200,7 @@ export class ChatModel implements Model {
   private readonly key?: string;
   private readonly stream: boolean;
   private readonly adder: ChatMessageAdder;
-  private abortCtl: AbortController | null = null;
+  private _abortCtl: AbortController | null = null;
 
   constructor({ adder, ...opts }: ChatModelOptions = Qwen3Small) {
     this.options = opts;
@@ -266,8 +266,8 @@ export class ChatModel implements Model {
   async invoke(
     chat: CompletionRequest
   ): Promise<{ message: AssistantMessage }> {
-    if (this.abortCtl) this.abortCtl.abort();
-    this.abortCtl = new AbortController();
+    if (this._abortCtl) this._abortCtl.abort();
+    this._abortCtl = new AbortController();
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json"
@@ -284,16 +284,16 @@ export class ChatModel implements Model {
       method: "POST",
       headers,
       body: JSON.stringify(request),
-      signal: this.abortCtl.signal
+      signal: this._abortCtl.signal
     });
 
     if (!res.ok) {
-      this.abortCtl = null;
+      this._abortCtl = null;
       throw new Error(await res.text());
     }
 
     if (!this.stream) {
-      this.abortCtl = null;
+      this._abortCtl = null;
       const raw = (await res.json()) as {
         message:
           | AssistantMessage
@@ -316,7 +316,7 @@ export class ChatModel implements Model {
       }
       buffer += decoder.decode();
     } finally {
-      this.abortCtl = null;
+      this._abortCtl = null;
     }
 
     const lines = buffer.trim().split(/\r?\n/).filter(Boolean);
@@ -360,9 +360,9 @@ export class ChatModel implements Model {
 
   /** @inheritdoc */
   stop = async () => {
-    if (this.abortCtl) {
-      this.abortCtl.abort();
-      this.abortCtl = null;
+    if (this._abortCtl) {
+      this._abortCtl.abort();
+      this._abortCtl = null;
     }
   };
 }
