@@ -133,12 +133,9 @@ export interface ChatModelOptions {
   removeThink?: boolean;
   /** No thinking prompt */
   noThinkPrompt?: string;
-  /** When `true`, requests a chunked streaming response. */
-  stream?: boolean;
-  /** Optional function to decode SSE */
-  decodeSSE?: (event: string) => string;
-  /** Optional callback on SSE */
-  onSSE?: (decoded: string) => void;
+
+  /** Custom response parsing */
+  customResponse?: (res: Response) => Promise<AssistantMessage>;
 }
 
 // @todo move to content?
@@ -202,17 +199,15 @@ export class ChatModel implements Model {
 
   private readonly url: string;
   private readonly key?: string;
-  private readonly stream: boolean;
   private readonly adder: ChatMessageAdder;
   private _abortCtl: AbortController | null = null;
 
   constructor({ adder, ...opts }: ChatModelOptions = Qwen3Small) {
     this.options = opts;
-    const { url, name, key, stream } = opts;
+    const { url, name, key } = opts;
     this.url = url;
     this.name = name;
     this.key = key;
-    this.stream = stream ?? false;
     this.adder = adder ?? defaultAdder;
   }
 
@@ -296,43 +291,45 @@ export class ChatModel implements Model {
       throw new Error(await res.text());
     }
 
-    if (!this.stream) {
-      this._abortCtl = null;
-      const raw = (await res.json()) as {
-        message:
-          | AssistantMessage
-          | { content: string; tool_calls?: ToolCall[] };
-      };
-      return this._finalize(raw);
-    }
+    const raw = this.options.customResponse
+      ? { message: await this.options.customResponse(res) }
+      : ((await res.json()) as {
+          message:
+            | AssistantMessage
+            | { content: string; tool_calls?: ToolCall[] };
+        });
 
-    // biome-ignore lint/style/noNonNullAssertion: res.ok
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
+    this._abortCtl = null;
+    return this._finalize(raw);
 
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        const decoded = this.options.decodeSSE
-          ? this.options.decodeSSE(chunk)
-          : chunk;
-        buffer += decoded;
-        if (this.options.onSSE) this.options.onSSE(decoded);
-      }
-      buffer += decoder.decode();
-    } finally {
-      this._abortCtl = null;
-    }
+    // // biome-ignore lint/style/noNonNullAssertion: res.ok
+    // const reader = res.body!.getReader();
+    // const decoder = new TextDecoder("utf-8");
+    // let buffer = "";
 
-    try {
-      const obj = JSON.parse(buffer);
-      return this._finalize(obj);
-    } catch (err) {
-      return this._finalize({ message: AssistantMessage(buffer) });
-    }
+    // try {
+    //   while (true) {
+    //     const { value, done } = await reader.read();
+    //     if (done) break;
+    //     const chunk = decoder.decode(value, { stream: true });
+    //     const decoded = this.options.decodeSSE
+    //       ? this.options.decodeSSE(chunk)
+    //       : chunk;
+    //     buffer += decoded;
+    //     if (this.options.onSSE) this.options.onSSE(decoded);
+    //   }
+    //   buffer += decoder.decode();
+    // } finally {
+    //   this._abortCtl = null;
+    //   if (this.options.onSSECompletion) this.options.onSSECompletion(buffer);
+    // }
+
+    // try {
+    //   const obj = JSON.parse(buffer);
+    //   return this._finalize(obj);
+    // } catch (err) {
+    //   return this._finalize({ message: AssistantMessage(buffer) });
+    // }
   }
 
   /** Build a provider‑specific completion request.  */
@@ -343,7 +340,7 @@ export class ChatModel implements Model {
     return {
       model: this.name,
       messages: messages as Message[],
-      stream: this.stream,
+      stream: !!this.options.customResponse, // @todo explicit option?
       tools: tools ? await toolList(tools) : undefined,
       tool_choice: "auto"
     };
