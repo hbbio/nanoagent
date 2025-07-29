@@ -32,7 +32,7 @@ export type Tool = {
 export type ChatMemory = Record<string, unknown>;
 
 /** Pure function that returns a *new* memory snapshot. */
-export type ChatMemoryPatch = <M extends ChatMemory>(state: M) => M;
+export type ChatMemoryPatch<M extends ChatMemory> = (state: M) => M;
 
 /** MCP extension header fields. */
 export const ContentJSON = "x-content";
@@ -51,20 +51,19 @@ export type ToolCallResponse<Memory extends ChatMemory, Out> = {
   /** Lambdascript program to mutate memory. */
   [ContentMemoryLambdascriptPatch]?: string;
   /** Internal non‑serialisable mutation. */
-  [ContentMemoryNonSerializablePatch]?: ChatMemoryPatch;
+  [ContentMemoryNonSerializablePatch]?: ChatMemoryPatch<Memory>;
 };
 
 /** Optional arguments passed to {@link content}. */
 export interface ToolContentOptions<Memory extends ChatMemory> {
   memory?: Memory;
-  memPatch?: ChatMemoryPatch;
+  memPatch?: ChatMemoryPatch<Memory>;
 }
 
 /**
  * Build a metadata object carrying memory modifications.
  */
 const buildMeta = <Memory extends ChatMemory>({
-  memory,
   memPatch
 }: ToolContentOptions<Memory> = {}) => ({
   ...(memPatch ? { [ContentMemoryNonSerializablePatch]: memPatch } : {})
@@ -163,7 +162,7 @@ export const tool = <
  */
 export const composePatches = <M extends ChatMemory>(
   memory: M,
-  patches: (ChatMemoryPatch | undefined)[]
+  patches: (ChatMemoryPatch<M> | undefined)[]
 ): M => {
   let acc = memory;
   const written = new Set<string>();

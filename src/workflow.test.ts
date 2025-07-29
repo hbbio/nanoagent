@@ -9,7 +9,7 @@ import {
   MistralSmall,
   type Model
 } from "./model";
-import type { ChatMemory, Tools } from "./tool";
+import type { ChatMemory } from "./tool";
 import type { AgentContext, AgentState } from "./workflow";
 import { runWorkflow, Sequence, stepAgent } from "./workflow";
 import { lastMessageIncludes } from "./yes";

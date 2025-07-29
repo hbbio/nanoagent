@@ -29,9 +29,11 @@ export const serveMCP = <Memory extends ChatMemory>(
           };
           const result = await toolRegistry.call(name, input, memory);
           const nextMem = result[ContentMemoryNonSerializablePatch]
-            ? (result[ContentMemoryNonSerializablePatch] as ChatMemoryPatch)(
-                memory
-              )
+            ? (
+                result[
+                  ContentMemoryNonSerializablePatch
+                ] as ChatMemoryPatch<Memory>
+              )(memory)
             : memory;
           return Response.json({ ...result, memory: nextMem });
         } catch (err) {
