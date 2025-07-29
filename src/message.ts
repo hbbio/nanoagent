@@ -1,6 +1,6 @@
 import { type Content, text, toContent } from "./content";
 import { stringify } from "./json";
-import { type TypedSchema, applySchema } from "./schema";
+import { applySchema, type TypedSchema } from "./schema";
 import {
   type ChatMemory,
   type ChatMemoryPatch,
@@ -37,6 +37,8 @@ export interface SystemMessage extends BaseMessage<"system"> {
 /** Human user message. */
 export interface UserMessage extends BaseMessage<"user"> {
   content: Content;
+  /** Is this generated for an agent step? */
+  fake?: boolean;
 }
 
 /** Assistant reply that may embed tool‑calls. */
@@ -112,7 +114,7 @@ export const getToolArguments = (
   if (typeof input === "string") {
     try {
       return JSON.parse(input);
-    } catch (err) {
+    } catch (_err) {
       const snippet = input.slice(0, 80) + (input.length > 80 ? "…" : "");
       throw new Error(`Failed to parse tool arguments string: ${snippet}`);
     }
@@ -159,7 +161,7 @@ export const executeToolCall = async <
   schema: TypedSchema<In>,
   memory: Memory,
   mode: "openai" | "mcp" = "openai"
-): Promise<{ message: ToolMessage; memPatch?: ChatMemoryPatch }> => {
+): Promise<{ message: ToolMessage; memPatch?: ChatMemoryPatch<Memory> }> => {
   try {
     const parsedArgs = getToolArguments(toolCall.function.arguments);
     const checkedArgs = applySchema(schema, parsedArgs as Partial<In>);
@@ -192,7 +194,7 @@ export const executeToolCall = async <
 /** Detect conflicts & compose an ordered list of memory patches. */
 export const composePatches = <M extends ChatMemory>(
   memory: M,
-  patches: (ChatMemoryPatch | undefined)[]
+  patches: (ChatMemoryPatch<M> | undefined)[]
 ): M => {
   let acc = memory;
   const written = new Set<string>();
@@ -237,7 +239,10 @@ export const callToolAndAppend = async <Memory extends ChatMemory>(
   if (new Set(ids).size !== ids.length)
     logger.error("Duplicate tool_call IDs detected.");
 
-  const results: { message: ToolMessage; memPatch?: ChatMemoryPatch }[] = [];
+  const results: {
+    message: ToolMessage;
+    memPatch?: ChatMemoryPatch<Memory>;
+  }[] = [];
   for (const call of last.tool_calls) {
     const def = tools[call.function.name];
     if (!def) {
@@ -274,7 +279,7 @@ export const callToolAndAppend = async <Memory extends ChatMemory>(
 /** Provider‑agnostic part of a chat‑completion request. */
 export interface CompletionRequestBase {
   model: string;
-  messages: Message[];
+  messages: readonly Message[];
   n?: number;
   stream?: boolean;
   stop?: string | string[];

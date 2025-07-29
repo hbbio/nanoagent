@@ -4,9 +4,9 @@
  * Exports
  * -------
  * • {@link HaltStatus} – discriminated union explaining why the loop stopped.
- * • {@link AgentState} – immutable snapshot travelling between steps.
+ * • {@link AgentState} – immutable snapshot traveling between steps.
  * • {@link SequenceOptions} – knobs for debugging and step limits.
- * • {@link AgentContext} – behaviour contract (pure hooks).
+ * • {@link AgentContext} – behavior contract (pure hooks).
  * • {@link stepAgent} – single deterministic transition.
  * • {@link loopAgent} – iterative driver until halted.
  * • {@link Sequence} – convenience wrapper for multi‑stage workflows.
@@ -56,7 +56,7 @@ export type AgentState<Memory> = {
 };
 
 /** Config for one sequence run. */
-export interface SequenceOptions {
+export interface SequenceOptions<Memory extends ChatMemory> {
   /** Maximum number of additional model calls to perform. */
   maxSteps?: number;
   /** When true, the framework prints debug output via `logger`. */
@@ -66,11 +66,17 @@ export interface SequenceOptions {
   /** Structured logger – defaults to the global console object. */
   logger?: Pick<Console, "log" | "warn" | "error">;
   /** ChatModel used for agent loop management, e.g. does the assistant requires user input */
-  yesModel: ChatModel;
+  yesModel: Model;
+  /** Callback on state change */
+  onStateChange?: (state: AgentState<Memory>) => void;
+  onStart?: (state: AgentState<Memory>) => void;
+  onStop?: (state: AgentState<Memory>) => void;
+  /** Delay in ms between calls, e.g. to debug infinite loops */
+  delay?: number;
 }
 
 /**
- * Agent behaviour contract.  All functions *must* be side‑effect‑free except
+ * Agent behavior contract.  All functions *must* be side‑effect‑free except
  * for `getUserInput`, which is allowed to perform I/O.
  */
 export interface AgentContext<Memory extends ChatMemory> {
@@ -98,7 +104,7 @@ export interface AgentContext<Memory extends ChatMemory> {
   nextSequence?: (state: AgentState<Memory>) => Promise<{
     ctx: AgentContext<Memory>;
     state: AgentState<Memory>;
-    options?: SequenceOptions;
+    options?: SequenceOptions<Memory>;
   }>;
   /**
    * Recovery hook invoked when the loop detects that progress has stalled.
@@ -123,7 +129,7 @@ const hasTwoAssistantInRow = (messages: readonly Message[]) =>
 export interface StepOptions {
   debug?: boolean;
   logger?: Pick<Console, "log" | "warn" | "error">;
-  yesModel: ChatModel;
+  yesModel: Model;
 }
 
 /**
@@ -176,11 +182,10 @@ export const stepAgent = async <Memory extends ChatMemory>(
   // Model (and tool) call
   let output: { messages: readonly Message[]; memory?: Memory };
   try {
-    output = await state.model.complete(
-      state.messages,
-      state.memory,
-      ctx.registry?.tools
-    );
+    output = await state.model.complete(state.messages, {
+      memory: state.memory,
+      tools: ctx.registry?.tools
+    });
   } catch (error) {
     const halted: AgentState<Memory> = {
       ...state,
@@ -227,6 +232,10 @@ export const stepAgent = async <Memory extends ChatMemory>(
   return newState;
 };
 
+/** timeout is a promise-based setTimeout call */
+export const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Repeatedly invoke `stepAgent` until the agent stops or step budget is
  * exhausted.  Converted from recursion to a `while` loop to avoid call‑stack
@@ -235,13 +244,16 @@ export const stepAgent = async <Memory extends ChatMemory>(
 export const loopAgent = async <Memory extends ChatMemory>(
   ctx: AgentContext<Memory>,
   initState: AgentState<Memory>,
-  options: SequenceOptions = { yesModel: new ChatModel(Gemma3Small) }
+  options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma3Small) }
 ): Promise<AgentState<Memory>> => {
   const logger = options.logger ?? console;
   let state = initState;
   let remaining = options.maxSteps ?? Number.POSITIVE_INFINITY;
 
   while (true) {
+    if (options?.delay) await sleep(options.delay);
+
+    if (options?.onStateChange) options.onStateChange(state);
     if (
       state.halted?.kind === HaltKind.Done ||
       state.halted?.kind === HaltKind.Stopped
@@ -251,11 +263,13 @@ export const loopAgent = async <Memory extends ChatMemory>(
     if (remaining === 0) {
       return { ...state, halted: { kind: HaltKind.Stopped } };
     }
+    if (options?.onStart) options.onStart(state);
     state = await stepAgent(ctx, state, {
       debug: options.debug,
       logger,
       yesModel: options.yesModel
     });
+    if (options?.onStop) options.onStop(state);
     remaining =
       remaining === Number.POSITIVE_INFINITY
         ? Number.POSITIVE_INFINITY
@@ -267,18 +281,22 @@ export const loopAgent = async <Memory extends ChatMemory>(
 export class Sequence<Memory extends ChatMemory> {
   private _ctx: AgentContext<Memory>;
   private _state: AgentState<Memory>;
-  private _options: SequenceOptions;
+  private _options: SequenceOptions<Memory>;
   private _logger: Pick<Console, "log" | "warn" | "error">;
 
   constructor(
     ctx: AgentContext<Memory>,
     state: AgentState<Memory>,
-    options: SequenceOptions = { yesModel: new ChatModel(Gemma3Small) }
+    options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma3Small) }
   ) {
     this._ctx = ctx;
     this._state = state;
     this._options = options;
     this._logger = options.logger ?? console;
+  }
+
+  get messages() {
+    return this._state.messages;
   }
 
   /** Replace the underlying state (e.g., after external persistence). */
@@ -292,7 +310,7 @@ export class Sequence<Memory extends ChatMemory> {
   };
 
   /** Snapshot current options. */
-  private get options(): SequenceOptions {
+  private get options(): SequenceOptions<Memory> {
     return this._options;
   }
 
@@ -324,7 +342,10 @@ export class Sequence<Memory extends ChatMemory> {
         getUserInput: nextCtx.getUserInput ?? preserved
       };
       // @todo preserve yesModel?
-      const mergedOpts: SequenceOptions = { ...this.options, ...nextOpts };
+      const mergedOpts: SequenceOptions<Memory> = {
+        ...this.options,
+        ...nextOpts
+      };
 
       if (this.options.debug)
         this._logger.log(`☎︎  Sequence → ${nextState.id ?? "-"}`);
@@ -337,13 +358,18 @@ export class Sequence<Memory extends ChatMemory> {
   }
 }
 
+export type WorkflowOptions<Memory extends ChatMemory> = {
+  onSequenceChange?: (seq: Sequence<Memory>) => void;
+};
+
 /**
  * Execute a workflow composed of chained `Sequence` objects until no new
  * sequence is produced.  Returns both the final `AgentState` and the ordered
  * history of sequences for inspection / debugging.
  */
 export const runWorkflow = async <Memory extends ChatMemory>(
-  init: Sequence<Memory>
+  init: Sequence<Memory>,
+  options?: WorkflowOptions<Memory>
 ): Promise<{ final: AgentState<Memory>; history: Sequence<Memory>[] }> => {
   const history: Sequence<Memory>[] = [];
   let current = init;
@@ -351,6 +377,10 @@ export const runWorkflow = async <Memory extends ChatMemory>(
   while (true) {
     history.push(current);
     const [next, state] = await current.next();
+    current.resetState(state);
+
+    if (options?.onSequenceChange) options.onSequenceChange(current);
+
     if (next === current) return { final: state, history };
     current = next;
   }

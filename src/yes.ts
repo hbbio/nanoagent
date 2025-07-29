@@ -1,6 +1,6 @@
 import { type Content, textIncludes } from "./content";
 import { type Message, SystemMessage, UserMessage } from "./message";
-import type { ChatModel } from "./model";
+import type { Model } from "./model";
 
 export const lastMessageIncludes =
   (text: string, options?: { caseInsensitive?: boolean }) =>
@@ -36,7 +36,7 @@ In all other cases, reply 'no' and nothing else.`;
  * answerIsYes asks about simple yes/no tasks to smaller models.
  */
 export const answerIsYes =
-  (guidelines: string, model: ChatModel) =>
+  (guidelines: string, model: Model) =>
   async (content: string | Content | null) => {
     if (!content) throw new Error("no content");
     const { messages } = await model.complete([
@@ -49,7 +49,7 @@ export const answerIsYes =
     });
   };
 
-export const requestsUserInput = (model: ChatModel) =>
+export const requestsUserInput = (model: Model) =>
   answerIsYes(UserInputGuidelines, model);
-export const wantsToExit = (model: ChatModel) =>
+export const wantsToExit = (model: Model) =>
   answerIsYes(WantsToExitGuidelines, model);

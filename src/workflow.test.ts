@@ -2,10 +2,16 @@ import { describe, expect, it } from "bun:test";
 
 import { toContent, toText } from "./content";
 import { type Message, SystemMessage, UserMessage } from "./message";
-import { ChatModel, Gemma3Small, MistralSmall, type Model } from "./model";
-import type { ChatMemory, Tools } from "./tool";
+import {
+  ChatModel,
+  type CompleteOptions,
+  Gemma3Small,
+  MistralSmall,
+  type Model
+} from "./model";
+import type { ChatMemory } from "./tool";
 import type { AgentContext, AgentState } from "./workflow";
-import { Sequence, runWorkflow, stepAgent } from "./workflow";
+import { runWorkflow, Sequence, stepAgent } from "./workflow";
 import { lastMessageIncludes } from "./yes";
 
 const yesModel = new ChatModel(Gemma3Small);
@@ -62,10 +68,9 @@ describe("Sequence Chaining", () => {
 class NoProgressModel implements Model {
   async complete<Memory extends ChatMemory>(
     messages: readonly Message[],
-    memory: Memory = {} as Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) {
-    return { messages, memory };
+    return { messages, memory: options?.memory || ({} as Memory) };
   }
   async stop() {}
 }
@@ -104,12 +109,14 @@ describe("Controller Stuck #1: no new messages", () => {
 class EmptyAssistantModel implements Model {
   async complete<Memory extends ChatMemory>(
     messages: readonly Message[],
-    memory: Memory = {} as Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) {
     // simulate assistant reply with empty content
     const reply = { role: "assistant" as const, content: toContent("") };
-    return { messages: [...messages, reply], memory };
+    return {
+      messages: [...messages, reply],
+      memory: options?.memory || ({} as Memory)
+    };
   }
 
   async stop() {}
@@ -145,8 +152,7 @@ class DoubleAssistantModel implements Model {
   private called = false;
   async complete<Memory extends ChatMemory>(
     messages: readonly Message[],
-    memory: Memory = {} as Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) {
     if (!this.called) {
       this.called = true;
@@ -156,7 +162,7 @@ class DoubleAssistantModel implements Model {
           ...messages,
           { role: "assistant" as const, content: toContent("Sure, working...") }
         ],
-        memory
+        memory: options?.memory || ({} as Memory)
       };
     }
     // second call: assistant again
@@ -165,7 +171,7 @@ class DoubleAssistantModel implements Model {
         ...messages,
         { role: "assistant" as const, content: toContent("Next step...") }
       ],
-      memory
+      memory: options?.memory || ({} as Memory)
     };
   }
 
@@ -203,13 +209,12 @@ class FlakyModel implements Model {
   private count = 0;
   async complete<Memory extends ChatMemory>(
     messages: readonly Message[],
-    memory: Memory = {} as Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) {
     this.count++;
     if (this.count < 2) {
       // no progress
-      return { messages, memory };
+      return { messages, memory: options?.memory || ({} as Memory) };
     }
     // then make progress
     return {
@@ -217,7 +222,7 @@ class FlakyModel implements Model {
         ...messages,
         { role: "assistant" as const, content: toContent("Done") }
       ],
-      memory
+      memory: options?.memory || ({} as Memory)
     };
   }
 

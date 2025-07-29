@@ -315,7 +315,7 @@ export interface AgentContext<M extends ChatMemory> {
   isFinal: (st: AgentState<M>) => Promise<boolean>;
   registry?: ToolRegistry<M>;
   nextSequence?: (st: AgentState<M>) => Promise<{
-    ctx: AgentContext<M>; state: AgentState<M>; options?: SequenceOptions;
+    ctx: AgentContext<M>; state: AgentState<M>; options?: SequenceOptions<M>;
   }>;
   controller?: (st: AgentState<M>) => Promise<AgentState<M>>;
 }
@@ -365,10 +365,10 @@ export const answerIsYes: (
   model: ChatModel
 ) => (content: string | Content | null) => Promise<boolean>;
 
-export const requestsUserInput: (model: ChatModel) =>
+export const requestsUserInput: (model: Model) =>
   (content: string | Content | null) => Promise<boolean>;
 
-export const wantsToExit: (model: ChatModel) =>
+export const wantsToExit: (model: Model) =>
   (content: string | Content | null) => Promise<boolean>;
 ```
 

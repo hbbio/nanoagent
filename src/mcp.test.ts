@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 
 import { MCPClient } from "./mcpClient";
 import { serveMCP } from "./mcpServer";
-import { ToolRegistry, content, tool } from "./tool";
+import { content, ToolRegistry, tool } from "./tool";
 
 const tools = {
   echo: tool(

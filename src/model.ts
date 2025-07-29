@@ -2,9 +2,9 @@ import { toText } from "./content";
 import {
   AssistantMessage,
   type CompletionRequest,
+  callToolAndAppend,
   type Message,
-  type ToolCall,
-  callToolAndAppend
+  type ToolCall
 } from "./message";
 import { type ChatMemory, type Tools, toolList } from "./tool";
 
@@ -36,7 +36,9 @@ export const ollama = (
 });
 
 const mistralSmall = "mistral-small3.1";
+const devstral = "devstral";
 export const MistralSmall = ollama(mistralSmall);
+export const Devstral = ollama(devstral);
 
 const llama32 = "llama3.2";
 export const Llama32 = ollama(llama32);
@@ -81,7 +83,7 @@ const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 export const chatgpt = (name: string): ChatModelOptions => ({
   url: OPENAI_URL,
   name,
-  key: process?.env?.CHATGPT_KEY,
+  key: isNode ? process.env?.CHATGPT_KEY : undefined,
   stringifyArguments: true
 });
 
@@ -119,8 +121,6 @@ export interface ChatModelOptions {
   name: string;
   /** Optional bearer token used for `Authorization: Bearer …`. */
   key?: string;
-  /** When `true`, requests a chunked streaming response. */
-  stream?: boolean;
   /** Optional custom message‐adder used to merge assistant replies. */
   adder?: ChatMessageAdder;
   /** Tool arguments must be stringified (OpenAI) */
@@ -133,6 +133,9 @@ export interface ChatModelOptions {
   removeThink?: boolean;
   /** No thinking prompt */
   noThinkPrompt?: string;
+
+  /** Custom response parsing */
+  customResponse?: (res: Response) => Promise<AssistantMessage>;
 }
 
 // @todo move to content?
@@ -159,6 +162,13 @@ export const defaultAdder = async (
  */
 export type ChatMessageAdder = typeof defaultAdder;
 
+export type CompleteOptions<Memory extends ChatMemory> = {
+  memory?: Memory;
+  tools?: Tools<Memory>;
+  /** callback on streaming output */
+  onOutput?: (progress: string) => void;
+};
+
 /**
  * Minimal interface a model must implement to be usable by the agent loop.
  */
@@ -171,8 +181,7 @@ export interface Model {
    */
   complete: <Memory extends ChatMemory>(
     input: readonly Message[],
-    memory?: Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) => Promise<{ messages: readonly Message[]; memory: Memory }>;
   /** Abort an in‑flight streaming request. */
   stop: () => Promise<void>;
@@ -190,21 +199,19 @@ export class ChatModel implements Model {
 
   private readonly url: string;
   private readonly key?: string;
-  private readonly stream: boolean;
   private readonly adder: ChatMessageAdder;
-  private abortCtl: AbortController | null = null;
+  private _abortCtl: AbortController | null = null;
 
   constructor({ adder, ...opts }: ChatModelOptions = Qwen3Small) {
     this.options = opts;
-    const { url, name, key, stream } = opts;
+    const { url, name, key } = opts;
     this.url = url;
     this.name = name;
     this.key = key;
-    this.stream = stream ?? false;
     this.adder = adder ?? defaultAdder;
   }
 
-  private _formatMessages(messages: Message[]) {
+  private _formatMessages(messages: readonly Message[]) {
     if (!this.options.stringifyContent) return messages;
     return messages.map((msg, i) => ({
       ...msg,
@@ -258,63 +265,71 @@ export class ChatModel implements Model {
   async invoke(
     chat: CompletionRequest
   ): Promise<{ message: AssistantMessage }> {
-    if (this.abortCtl) this.abortCtl.abort();
-    this.abortCtl = new AbortController();
+    if (this._abortCtl) this._abortCtl.abort();
+    this._abortCtl = new AbortController();
 
     const headers: Record<string, string> = {
-      "Content-Type": "application/json"
+      "Content-Type": "application/json; charset=utf-8"
     };
     if (this.key) headers.Authorization = `Bearer ${this.key}`;
+
+    const request = {
+      ...chat,
+      temperature: chat.temperature ?? this.options.temperature ?? undefined,
+      messages: this._formatMessages(chat.messages)
+    } as CompletionRequest;
 
     const res = await fetch(this.url, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        ...chat,
-        temperature: chat.temperature ?? this.options.temperature ?? undefined,
-        messages: this._formatMessages(chat.messages)
-      } as CompletionRequest),
-      signal: this.abortCtl.signal
+      body: JSON.stringify(request),
+      signal: this._abortCtl.signal
     });
 
     if (!res.ok) {
-      this.abortCtl = null;
+      this._abortCtl = null;
       throw new Error(await res.text());
     }
 
-    if (!this.stream) {
-      this.abortCtl = null;
-      const raw = (await res.json()) as {
-        message:
-          | AssistantMessage
-          | { content: string; tool_calls?: ToolCall[] };
-      };
-      return this._finalize(raw);
-    }
+    const raw = this.options.customResponse
+      ? { message: await this.options.customResponse(res) }
+      : ((await res.json()) as {
+          message:
+            | AssistantMessage
+            | { content: string; tool_calls?: ToolCall[] };
+        });
 
-    // biome-ignore lint/style/noNonNullAssertion: res.ok
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-      }
-      buffer += decoder.decode();
-    } finally {
-      this.abortCtl = null;
-    }
-
-    const lines = buffer.trim().split(/\r?\n/).filter(Boolean);
-    if (!lines?.length) return { message: AssistantMessage("") };
-    // biome-ignore lint/style/noNonNullAssertion: lines.length > 0
-    const last = lines[lines.length - 1]!;
-    const jsonLine = last.startsWith("data:") ? last.slice(5) : last;
-    const raw = JSON.parse(jsonLine);
+    this._abortCtl = null;
     return this._finalize(raw);
+
+    // // biome-ignore lint/style/noNonNullAssertion: res.ok
+    // const reader = res.body!.getReader();
+    // const decoder = new TextDecoder("utf-8");
+    // let buffer = "";
+
+    // try {
+    //   while (true) {
+    //     const { value, done } = await reader.read();
+    //     if (done) break;
+    //     const chunk = decoder.decode(value, { stream: true });
+    //     const decoded = this.options.decodeSSE
+    //       ? this.options.decodeSSE(chunk)
+    //       : chunk;
+    //     buffer += decoded;
+    //     if (this.options.onSSE) this.options.onSSE(decoded);
+    //   }
+    //   buffer += decoder.decode();
+    // } finally {
+    //   this._abortCtl = null;
+    //   if (this.options.onSSECompletion) this.options.onSSECompletion(buffer);
+    // }
+
+    // try {
+    //   const obj = JSON.parse(buffer);
+    //   return this._finalize(obj);
+    // } catch (err) {
+    //   return this._finalize({ message: AssistantMessage(buffer) });
+    // }
   }
 
   /** Build a provider‑specific completion request.  */
@@ -325,7 +340,7 @@ export class ChatModel implements Model {
     return {
       model: this.name,
       messages: messages as Message[],
-      stream: this.stream,
+      stream: !!this.options.customResponse, // @todo explicit option?
       tools: tools ? await toolList(tools) : undefined,
       tool_choice: "auto"
     };
@@ -334,19 +349,24 @@ export class ChatModel implements Model {
   /** @inheritdoc */
   async complete<Memory extends ChatMemory>(
     input: readonly Message[],
-    memory: Memory = {} as Memory,
-    tools?: Tools<Memory>
+    options?: CompleteOptions<Memory>
   ) {
-    const { message } = await this.invoke(await this.makeRequest(input, tools));
+    const { message } = await this.invoke(
+      await this.makeRequest(input, options?.tools)
+    );
     const merged = await this.adder(input, message);
-    return callToolAndAppend(merged, memory, tools);
+    return callToolAndAppend(
+      merged,
+      options?.memory || ({} as Memory),
+      options?.tools
+    );
   }
 
   /** @inheritdoc */
   stop = async () => {
-    if (this.abortCtl) {
-      this.abortCtl.abort();
-      this.abortCtl = null;
+    if (this._abortCtl) {
+      this._abortCtl.abort();
+      this._abortCtl = null;
     }
   };
 }

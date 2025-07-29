@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { type TypedSchema, applySchema } from "./schema";
+import { applySchema, type TypedSchema } from "./schema";
 
 const schema = {
   type: "object",
