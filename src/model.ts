@@ -216,7 +216,7 @@ export class ChatModel implements Model {
     this.adder = adder ?? defaultAdder;
   }
 
-  private _formatMessages(messages: Message[]) {
+  private _formatMessages(messages: readonly Message[]) {
     if (!this.options.stringifyContent) return messages;
     return messages.map((msg, i) => ({
       ...msg,

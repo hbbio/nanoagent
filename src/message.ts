@@ -276,7 +276,7 @@ export const callToolAndAppend = async <Memory extends ChatMemory>(
 /** Provider‑agnostic part of a chat‑completion request. */
 export interface CompletionRequestBase {
   model: string;
-  messages: Message[];
+  messages: readonly Message[];
   n?: number;
   stream?: boolean;
   stop?: string | string[];
