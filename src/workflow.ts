@@ -71,10 +71,12 @@ export interface SequenceOptions<Memory extends ChatMemory> {
   onStateChange?: (state: AgentState<Memory>) => void;
   onStart?: (state: AgentState<Memory>) => void;
   onStop?: (state: AgentState<Memory>) => void;
+  /** Delay in ms between calls, e.g. to debug infinite loops */
+  delay?: number;
 }
 
 /**
- * Agent behaviour contract.  All functions *must* be side‑effect‑free except
+ * Agent behavior contract.  All functions *must* be side‑effect‑free except
  * for `getUserInput`, which is allowed to perform I/O.
  */
 export interface AgentContext<Memory extends ChatMemory> {
@@ -230,6 +232,10 @@ export const stepAgent = async <Memory extends ChatMemory>(
   return newState;
 };
 
+/** timeout is a promise-based setTimeout call */
+export const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
  * Repeatedly invoke `stepAgent` until the agent stops or step budget is
  * exhausted.  Converted from recursion to a `while` loop to avoid call‑stack
@@ -245,6 +251,8 @@ export const loopAgent = async <Memory extends ChatMemory>(
   let remaining = options.maxSteps ?? Number.POSITIVE_INFINITY;
 
   while (true) {
+    if (options?.delay) await sleep(options.delay);
+
     if (options?.onStateChange) options.onStateChange(state);
     if (
       state.halted?.kind === HaltKind.Done ||
