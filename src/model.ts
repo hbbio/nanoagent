@@ -2,9 +2,9 @@ import { toText } from "./content";
 import {
   AssistantMessage,
   type CompletionRequest,
+  callToolAndAppend,
   type Message,
-  type ToolCall,
-  callToolAndAppend
+  type ToolCall
 } from "./message";
 import { type ChatMemory, type Tools, toolList } from "./tool";
 

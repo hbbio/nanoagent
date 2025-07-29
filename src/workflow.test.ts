@@ -11,7 +11,7 @@ import {
 } from "./model";
 import type { ChatMemory, Tools } from "./tool";
 import type { AgentContext, AgentState } from "./workflow";
-import { Sequence, runWorkflow, stepAgent } from "./workflow";
+import { runWorkflow, Sequence, stepAgent } from "./workflow";
 import { lastMessageIncludes } from "./yes";
 
 const yesModel = new ChatModel(Gemma3Small);

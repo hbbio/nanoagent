@@ -3,9 +3,9 @@ import { describe, expect, it } from "bun:test";
 import { toText } from "./content";
 import {
   type AssistantMessage,
+  getToolArguments,
   type ToolCall,
-  UserMessage,
-  getToolArguments
+  UserMessage
 } from "./message";
 import { ChatModel, Llama32, Qwen3MidMLX } from "./model";
 import { content, tool } from "./tool";

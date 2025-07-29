@@ -4,9 +4,9 @@
  * Exports
  * -------
  * • {@link HaltStatus} – discriminated union explaining why the loop stopped.
- * • {@link AgentState} – immutable snapshot travelling between steps.
+ * • {@link AgentState} – immutable snapshot traveling between steps.
  * • {@link SequenceOptions} – knobs for debugging and step limits.
- * • {@link AgentContext} – behaviour contract (pure hooks).
+ * • {@link AgentContext} – behavior contract (pure hooks).
  * • {@link stepAgent} – single deterministic transition.
  * • {@link loopAgent} – iterative driver until halted.
  * • {@link Sequence} – convenience wrapper for multi‑stage workflows.

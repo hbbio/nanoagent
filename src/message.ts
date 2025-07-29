@@ -1,6 +1,6 @@
 import { type Content, text, toContent } from "./content";
 import { stringify } from "./json";
-import { type TypedSchema, applySchema } from "./schema";
+import { applySchema, type TypedSchema } from "./schema";
 import {
   type ChatMemory,
   type ChatMemoryPatch,
