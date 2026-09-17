@@ -27,6 +27,7 @@ export {
   getToolArguments,
   type Message,
   type MessageRole,
+  type ResponseItem,
   SystemMessage,
   type ToolCall,
   type ToolMessage,
@@ -42,6 +43,7 @@ export {
 } from "./model";
 export {
   ChatGPT4o,
+  ChatGPT6Astra,
   ChatGPT41,
   ChatGPT41Mini,
   ChatGPT41Nano,

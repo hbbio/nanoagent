@@ -196,12 +196,34 @@ export CHATGPT_KEY=...
 And then create instances with:
 
 ```ts
-import { ChatModel, ChatGPT4o } from "@hbbio/nanoagent";
-const model = new ChatModel(ChatGPT4o);
+import { ChatModel, ChatGPT6Astra } from "@hbbio/nanoagent";
+const model = new ChatModel(ChatGPT6Astra);
 ```
 
 or one of the predefined model names. Call any present or future model using
 `chatgpt("name")`.
+
+GPT-6 Astra uses the [Responses API for tool calling](https://developers.openai.com/api/docs/guides/latest-model).
+`ChatGPT6Astra` and `chatgpt("gpt-6-astra")` select that endpoint automatically.
+The existing `complete` and agent APIs work the same way. Responses output,
+including encrypted reasoning and message phases, is retained in the
+transcript's `responseOutput` field and replayed on later calls with
+`store: false`; keep that field when persisting a conversation.
+
+Configure reasoning effort instead of sampling parameters for Astra:
+
+```ts
+import { ChatModel, chatgpt } from "@hbbio/nanoagent";
+
+const model = new ChatModel(chatgpt("gpt-6-astra", {
+  reasoningEffort: "low",
+}));
+```
+
+Astra rejects `temperature` and `top_p`. The Responses adapter supports
+non-streaming JSON requests; `customResponse` remains a Chat Completions
+option. Other presets use Chat Completions by default;
+pass `{ api: "responses" }` to `chatgpt` to opt another supported model in.
 
 ### OpenRouter (including free models)
 

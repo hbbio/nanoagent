@@ -75,14 +75,27 @@ export const Qwen3MidMLX = lms(qwen3_14b_mlx, qwen3NoThink);
 /** OpenAI */
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
-export const chatgpt = (name: string): ChatModelOptions => ({
-  url: OPENAI_URL,
-  name,
-  key: isNode ? process.env?.CHATGPT_KEY : undefined,
-  stringifyArguments: true
-});
+export const chatgpt = (
+  name: string,
+  options?: Partial<ChatModelOptions>
+): ChatModelOptions => {
+  const api = options?.api ?? (name.startsWith("gpt-6") ? "responses" : "chat");
+  return {
+    url: api === "responses" ? OPENAI_RESPONSES_URL : OPENAI_URL,
+    name,
+    key: isNode ? process.env?.CHATGPT_KEY : undefined,
+    stringifyArguments: true,
+    stringifyContent: true,
+    ...options,
+    api
+  };
+};
 
+export const ChatGPT6Astra = chatgpt("gpt-6-astra");
+
+/** Legacy versioned presets retain their original model IDs. */
 const gpt4o = "gpt-4o";
 const gpt41 = "gpt-4.1";
 const gpt41mini = "gpt-4.1-mini";

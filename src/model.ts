@@ -22,6 +22,7 @@ import {
   type ToolCall
 } from "./message";
 import { Qwen3Small } from "./provider";
+import { makeResponsesRequest, parseResponse } from "./responses";
 import { type ChatMemory, type Tools, toolList } from "./tool";
 
 // Preserve existing direct imports from the model module.
@@ -31,10 +32,12 @@ export * from "./provider";
  * Options used when instantiating {@link ChatModel}.
  */
 export interface ChatModelOptions {
-  /** HTTP endpoint that accepts OpenAI‑style chat‑completions JSON. */
+  /** HTTP endpoint for the selected chat or Responses protocol. */
   url: string;
   /** Model identifier passed to the provider. */
   name: string;
+  /** Wire protocol; existing providers default to Chat Completions. */
+  api?: "chat" | "responses";
   /** Optional bearer token used for `Authorization: Bearer …`. */
   key?: string;
   /** Additional HTTP headers, e.g. OpenRouter app attribution. */
@@ -47,6 +50,8 @@ export interface ChatModelOptions {
   stringifyContent?: boolean;
   /** Override temperature for all messages */
   temperature?: number;
+  /** Reasoning effort for the Responses API. */
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   /** Remove thinking */
   removeThink?: boolean;
   /** No thinking prompt */
@@ -91,7 +96,7 @@ export type CompleteOptions<Memory extends ChatMemory> = {
  * Minimal interface a model must implement to be usable by the agent loop.
  */
 export interface Model {
-  /** Human‑readable model name (e.g. "gpt‑4o-mini"). */
+  /** Provider model identifier (e.g. "gpt-6-astra"). */
   name?: string;
   /**
    * Produce the next assistant turn — including any tool calls — and return the
@@ -101,15 +106,15 @@ export interface Model {
     input: readonly Message[],
     options?: CompleteOptions<Memory>
   ) => Promise<{ messages: readonly Message[]; memory: Memory }>;
-  /** Abort an in‑flight streaming request. */
+  /** Abort an in-flight request. */
   stop: () => Promise<void>;
 }
 
 /**
  * Concrete HTTP chat‑model wrapper.
  *
- * Supports streaming (`options.stream = true`) and exposes `stop()` which
- * cancels the underlying `fetch` via `AbortController`.
+ * Supports chat-completion and Responses endpoints. Streaming chat responses
+ * require a `customResponse` parser; `stop()` cancels the underlying fetch.
  */
 export class ChatModel implements Model {
   readonly name: string;
@@ -130,9 +135,15 @@ export class ChatModel implements Model {
   }
 
   private _formatMessages(messages: readonly Message[]) {
+    // Responses state must not leak into requests to chat-completion providers.
+    const history = messages.map((msg) => {
+      if (msg.role !== "assistant" || !msg.responseOutput) return msg;
+      const { responseOutput: _output, ...message } = msg;
+      return message;
+    });
     if (!this.options.stringifyContent && !this.options.stringifyArguments)
-      return messages;
-    return messages.map((msg, i) => ({
+      return history;
+    return history.map((msg, i) => ({
       ...msg,
       ...(this.options.stringifyContent
         ? {
@@ -197,78 +208,47 @@ export class ChatModel implements Model {
   }
 
   /**
-   * Execute a chat completion request and return the provider's raw payload.
-   * Streaming responses are concatenated into a single JSON object containing
-   * the final assistant message.
+   * Execute a completion request and normalize the assistant message.
+   * Responses output items are retained on the message for subsequent turns.
    */
   async invoke(
     chat: CompletionRequest
   ): Promise<{ message: AssistantMessage }> {
+    const request =
+      this.options.api === "responses"
+        ? makeResponsesRequest(chat, this.options)
+        : {
+            ...chat,
+            temperature: chat.temperature ?? this.options.temperature,
+            messages: this._formatMessages(chat.messages)
+          };
     if (this._abortCtl) this._abortCtl.abort();
-    this._abortCtl = new AbortController();
+    const abortCtl = new AbortController();
+    this._abortCtl = abortCtl;
 
     const headers = new Headers(this.options.headers);
     if (!headers.has("Content-Type"))
       headers.set("Content-Type", "application/json; charset=utf-8");
     if (this.key) headers.set("Authorization", `Bearer ${this.key}`);
 
-    const request = {
-      ...chat,
-      temperature: chat.temperature ?? this.options.temperature ?? undefined,
-      messages: this._formatMessages(chat.messages)
-    } as CompletionRequest;
+    try {
+      const res = await fetch(this.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(request),
+        signal: abortCtl.signal
+      });
+      if (!res.ok) throw new Error(await res.text());
+      if (this.options.api === "responses")
+        return { message: parseResponse(await res.json()) };
 
-    const res = await fetch(this.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(request),
-      signal: this._abortCtl.signal
-    });
-
-    if (!res.ok) {
-      this._abortCtl = null;
-      throw new Error(await res.text());
+      const raw = this.options.customResponse
+        ? { message: await this.options.customResponse(res) }
+        : ((await res.json()) as { message: AssistantMessage });
+      return this._finalize(raw);
+    } finally {
+      if (this._abortCtl === abortCtl) this._abortCtl = null;
     }
-
-    const raw = this.options.customResponse
-      ? { message: await this.options.customResponse(res) }
-      : ((await res.json()) as {
-          message:
-            | AssistantMessage
-            | { content: string; tool_calls?: ToolCall[] };
-        });
-
-    this._abortCtl = null;
-    return this._finalize(raw);
-
-    // // biome-ignore lint/style/noNonNullAssertion: res.ok
-    // const reader = res.body!.getReader();
-    // const decoder = new TextDecoder("utf-8");
-    // let buffer = "";
-
-    // try {
-    //   while (true) {
-    //     const { value, done } = await reader.read();
-    //     if (done) break;
-    //     const chunk = decoder.decode(value, { stream: true });
-    //     const decoded = this.options.decodeSSE
-    //       ? this.options.decodeSSE(chunk)
-    //       : chunk;
-    //     buffer += decoded;
-    //     if (this.options.onSSE) this.options.onSSE(decoded);
-    //   }
-    //   buffer += decoder.decode();
-    // } finally {
-    //   this._abortCtl = null;
-    //   if (this.options.onSSECompletion) this.options.onSSECompletion(buffer);
-    // }
-
-    // try {
-    //   const obj = JSON.parse(buffer);
-    //   return this._finalize(obj);
-    // } catch (err) {
-    //   return this._finalize({ message: AssistantMessage(buffer) });
-    // }
   }
 
   /** Build a provider‑specific completion request.  */
