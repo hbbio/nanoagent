@@ -27,34 +27,55 @@ export {
   getToolArguments,
   type Message,
   type MessageRole,
+  type ResponseItem,
   SystemMessage,
   type ToolCall,
   type ToolMessage,
   UserMessage
 } from "./message";
 export {
-  ChatGPT4o,
-  ChatGPT41,
-  ChatGPT41Mini,
-  ChatGPT41Nano,
   type ChatMessageAdder,
   ChatModel,
   type ChatModelOptions,
   type CompleteOptions,
+  defaultAdder,
+  type Model
+} from "./model";
+export {
+  ChatGPT4o,
+  ChatGPT6Astra,
+  ChatGPT41,
+  ChatGPT41Mini,
+  ChatGPT41Nano,
+  ChatGPT56Luna,
+  ChatGPT56Sol,
+  ChatGPT56Terra,
   chatgpt,
   Devstral,
-  defaultAdder,
+  Devstral2,
+  DevstralSmall2,
   Gemma3Mid,
   Gemma3Small,
+  Gemma4Mid,
+  Gemma4Small,
+  Llama4Maverick,
+  Llama4Scout,
   Llama32,
+  lms,
   MistralSmall,
-  type Model,
+  Nemotron3UltraFree,
   ollama,
+  openrouter,
   Qwen3MidMLX,
   Qwen3Small,
   Qwen3Tiny,
-  Qwen3TinyThink
-} from "./model";
+  Qwen3TinyThink,
+  Qwen35Small,
+  Qwen35Tiny,
+  Qwen35TinyThink,
+  Qwen38Mid,
+  Qwen38MidMLX
+} from "./provider";
 export {
   applySchema,
   type JSONSchemaArray,

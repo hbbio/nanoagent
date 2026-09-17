@@ -1,101 +1,3 @@
-import { toText } from "./content";
-import {
-  AssistantMessage,
-  type CompletionRequest,
-  callToolAndAppend,
-  type Message,
-  type ToolCall
-} from "./message";
-import { type ChatMemory, type Tools, toolList } from "./tool";
-
-const isNode = typeof process !== "undefined" && !!process.versions?.node;
-
-/** Ollama */
-
-const OLLAMA_DEFAULT_ORIGIN = "http://localhost:11434";
-const OLLAMA_PATH = "/api/chat";
-
-export const OLLAMA_URL = (() => {
-  let origin = OLLAMA_DEFAULT_ORIGIN;
-
-  if (isNode && process.env.OLLAMA_HOST) {
-    origin = process.env.OLLAMA_HOST.replace(/\/+$/, ""); // remove trailing slash(es)
-  }
-
-  return `${origin}${OLLAMA_PATH}`;
-})();
-
-export const ollama = (
-  name: string,
-  options?: Partial<ChatModelOptions>
-): ChatModelOptions => ({
-  url: OLLAMA_URL,
-  name,
-  stringifyContent: true,
-  ...options
-});
-
-const mistralSmall = "mistral-small3.2";
-const devstral = "devstral";
-export const MistralSmall = ollama(mistralSmall);
-export const Devstral = ollama(devstral);
-
-const llama32 = "llama3.2";
-export const Llama32 = ollama(llama32);
-
-const gemma3 = "gemma3:4b-it-qat";
-const gemma3mid = "gemma3:27b-it-qat";
-export const Gemma3Small = ollama(gemma3);
-export const Gemma3Mid = ollama(gemma3mid);
-
-const qwen3_06b = "qwen3:0.6b";
-const qwen3_4b = "qwen3:4b";
-const qwen3NoThink: Partial<ChatModelOptions> = {
-  removeThink: true,
-  noThinkPrompt: "\n\n/nothink"
-};
-export const Qwen3Tiny = ollama(qwen3_06b, qwen3NoThink);
-export const Qwen3TinyThink = ollama(qwen3_06b);
-export const Qwen3Small = ollama(qwen3_4b, qwen3NoThink);
-
-/** LM Studio */
-
-const LMS_DEFAULT_ORIGIN = "http://localhost:1234";
-const LMS_PATH = "/v1/chat/completions";
-
-export const lms = (
-  name: string,
-  options?: Partial<ChatModelOptions>
-): ChatModelOptions => ({
-  url: LMS_DEFAULT_ORIGIN + LMS_PATH,
-  name,
-  stringifyContent: true,
-  ...options
-});
-
-const qwen3_14b_mlx = "qwen3-14b-mlx";
-export const Qwen3MidMLX = lms(qwen3_14b_mlx, qwen3NoThink);
-
-/** OpenAI */
-
-const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-
-export const chatgpt = (name: string): ChatModelOptions => ({
-  url: OPENAI_URL,
-  name,
-  key: isNode ? process.env?.CHATGPT_KEY : undefined,
-  stringifyArguments: true
-});
-
-const gpt4o = "gpt-4o";
-const gpt41 = "gpt-4.1";
-const gpt41mini = "gpt-4.1-mini";
-const gpt41nano = "gpt-4.1-nano";
-export const ChatGPT4o = chatgpt(gpt4o);
-export const ChatGPT41 = chatgpt(gpt41);
-export const ChatGPT41Mini = chatgpt(gpt41mini);
-export const ChatGPT41Nano = chatgpt(gpt41nano);
-
 /**
  * Minimal remote chat‑model wrapper with optional streaming and graceful
  * cancellation.  Designed for the NanoAgent framework.
@@ -111,24 +13,47 @@ export const ChatGPT41Nano = chatgpt(gpt41nano);
  * @module model
  */
 
+import { toText } from "./content";
+import {
+  AssistantMessage,
+  type CompletionRequest,
+  callToolAndAppend,
+  type Message,
+  type ToolCall
+} from "./message";
+import { Qwen35Small } from "./provider";
+import { makeResponsesRequest, parseResponse } from "./responses";
+import { type ChatMemory, type Tools, toolList } from "./tool";
+
+// Preserve existing direct imports from the model module.
+export * from "./provider";
+
 /**
  * Options used when instantiating {@link ChatModel}.
  */
 export interface ChatModelOptions {
-  /** HTTP endpoint that accepts OpenAI‑style chat‑completions JSON. */
+  /** HTTP endpoint for the selected chat or Responses protocol. */
   url: string;
   /** Model identifier passed to the provider. */
   name: string;
+  /** Wire protocol; existing providers default to Chat Completions. */
+  api?: "chat" | "responses";
   /** Optional bearer token used for `Authorization: Bearer …`. */
   key?: string;
+  /** Additional HTTP headers, e.g. OpenRouter app attribution. */
+  headers?: Record<string, string>;
   /** Optional custom message‐adder used to merge assistant replies. */
   adder?: ChatMessageAdder;
   /** Tool arguments must be stringified (OpenAI) */
   stringifyArguments?: boolean;
-  /** Messages content should be stringified (ollama) */
+  /** Serialize message content as text for chat-completion providers. */
   stringifyContent?: boolean;
   /** Override temperature for all messages */
   temperature?: number;
+  /** Enable or disable reasoning on Ollama models that support thinking. */
+  think?: boolean;
+  /** Reasoning effort for the Responses API. */
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   /** Remove thinking */
   removeThink?: boolean;
   /** No thinking prompt */
@@ -173,7 +98,7 @@ export type CompleteOptions<Memory extends ChatMemory> = {
  * Minimal interface a model must implement to be usable by the agent loop.
  */
 export interface Model {
-  /** Human‑readable model name (e.g. "gpt‑4o-mini"). */
+  /** Provider model identifier (e.g. "gpt-6-astra"). */
   name?: string;
   /**
    * Produce the next assistant turn — including any tool calls — and return the
@@ -183,15 +108,15 @@ export interface Model {
     input: readonly Message[],
     options?: CompleteOptions<Memory>
   ) => Promise<{ messages: readonly Message[]; memory: Memory }>;
-  /** Abort an in‑flight streaming request. */
+  /** Abort an in-flight request. */
   stop: () => Promise<void>;
 }
 
 /**
  * Concrete HTTP chat‑model wrapper.
  *
- * Supports streaming (`options.stream = true`) and exposes `stop()` which
- * cancels the underlying `fetch` via `AbortController`.
+ * Supports chat-completion and Responses endpoints. Streaming chat responses
+ * require a `customResponse` parser; `stop()` cancels the underlying fetch.
  */
 export class ChatModel implements Model {
   readonly name: string;
@@ -202,7 +127,7 @@ export class ChatModel implements Model {
   private readonly adder: ChatMessageAdder;
   private _abortCtl: AbortController | null = null;
 
-  constructor({ adder, ...opts }: ChatModelOptions = Qwen3Small) {
+  constructor({ adder, ...opts }: ChatModelOptions = Qwen35Small) {
     this.options = opts;
     const { url, name, key } = opts;
     this.url = url;
@@ -212,15 +137,42 @@ export class ChatModel implements Model {
   }
 
   private _formatMessages(messages: readonly Message[]) {
-    if (!this.options.stringifyContent) return messages;
-    return messages.map((msg, i) => ({
+    // Responses state must not leak into requests to chat-completion providers.
+    const history = messages.map((msg) => {
+      if (msg.role !== "assistant" || !msg.responseOutput) return msg;
+      const { responseOutput: _output, ...message } = msg;
+      return message;
+    });
+    if (!this.options.stringifyContent && !this.options.stringifyArguments)
+      return history;
+    return history.map((msg, i) => ({
       ...msg,
-      content: msg.content
-        ? toText(msg.content) +
-          (i === messages.length - 1 && this.options?.removeThink
-            ? this.options?.noThinkPrompt || ""
-            : "")
-        : null
+      ...(this.options.stringifyContent
+        ? {
+            content: msg.content
+              ? toText(msg.content) +
+                (i === messages.length - 1 && this.options.removeThink
+                  ? this.options.noThinkPrompt || ""
+                  : "")
+              : null
+          }
+        : {}),
+      ...(this.options.stringifyArguments &&
+      msg.role === "assistant" &&
+      msg.tool_calls
+        ? {
+            tool_calls: msg.tool_calls.map((call) => ({
+              ...call,
+              function: {
+                ...call.function,
+                arguments:
+                  typeof call.function.arguments === "string"
+                    ? call.function.arguments
+                    : JSON.stringify(call.function.arguments)
+              }
+            }))
+          }
+        : {})
     }));
   }
 
@@ -258,78 +210,48 @@ export class ChatModel implements Model {
   }
 
   /**
-   * Execute a chat completion request and return the provider's raw payload.
-   * Streaming responses are concatenated into a single JSON object containing
-   * the final assistant message.
+   * Execute a completion request and normalize the assistant message.
+   * Responses output items are retained on the message for subsequent turns.
    */
   async invoke(
     chat: CompletionRequest
   ): Promise<{ message: AssistantMessage }> {
+    const request =
+      this.options.api === "responses"
+        ? makeResponsesRequest(chat, this.options)
+        : {
+            ...chat,
+            temperature: chat.temperature ?? this.options.temperature,
+            think: chat.think ?? this.options.think,
+            messages: this._formatMessages(chat.messages)
+          };
     if (this._abortCtl) this._abortCtl.abort();
-    this._abortCtl = new AbortController();
+    const abortCtl = new AbortController();
+    this._abortCtl = abortCtl;
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json; charset=utf-8"
-    };
-    if (this.key) headers.Authorization = `Bearer ${this.key}`;
+    const headers = new Headers(this.options.headers);
+    if (!headers.has("Content-Type"))
+      headers.set("Content-Type", "application/json; charset=utf-8");
+    if (this.key) headers.set("Authorization", `Bearer ${this.key}`);
 
-    const request = {
-      ...chat,
-      temperature: chat.temperature ?? this.options.temperature ?? undefined,
-      messages: this._formatMessages(chat.messages)
-    } as CompletionRequest;
+    try {
+      const res = await fetch(this.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(request),
+        signal: abortCtl.signal
+      });
+      if (!res.ok) throw new Error(await res.text());
+      if (this.options.api === "responses")
+        return { message: parseResponse(await res.json()) };
 
-    const res = await fetch(this.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(request),
-      signal: this._abortCtl.signal
-    });
-
-    if (!res.ok) {
-      this._abortCtl = null;
-      throw new Error(await res.text());
+      const raw = this.options.customResponse
+        ? { message: await this.options.customResponse(res) }
+        : ((await res.json()) as { message: AssistantMessage });
+      return this._finalize(raw);
+    } finally {
+      if (this._abortCtl === abortCtl) this._abortCtl = null;
     }
-
-    const raw = this.options.customResponse
-      ? { message: await this.options.customResponse(res) }
-      : ((await res.json()) as {
-          message:
-            | AssistantMessage
-            | { content: string; tool_calls?: ToolCall[] };
-        });
-
-    this._abortCtl = null;
-    return this._finalize(raw);
-
-    // // biome-ignore lint/style/noNonNullAssertion: res.ok
-    // const reader = res.body!.getReader();
-    // const decoder = new TextDecoder("utf-8");
-    // let buffer = "";
-
-    // try {
-    //   while (true) {
-    //     const { value, done } = await reader.read();
-    //     if (done) break;
-    //     const chunk = decoder.decode(value, { stream: true });
-    //     const decoded = this.options.decodeSSE
-    //       ? this.options.decodeSSE(chunk)
-    //       : chunk;
-    //     buffer += decoded;
-    //     if (this.options.onSSE) this.options.onSSE(decoded);
-    //   }
-    //   buffer += decoder.decode();
-    // } finally {
-    //   this._abortCtl = null;
-    //   if (this.options.onSSECompletion) this.options.onSSECompletion(buffer);
-    // }
-
-    // try {
-    //   const obj = JSON.parse(buffer);
-    //   return this._finalize(obj);
-    // } catch (err) {
-    //   return this._finalize({ message: AssistantMessage(buffer) });
-    // }
   }
 
   /** Build a provider‑specific completion request.  */
@@ -337,12 +259,14 @@ export class ChatModel implements Model {
     messages: readonly Message[],
     tools?: Tools<Memory>
   ): Promise<CompletionRequest> {
+    const availableTools = tools ? await toolList(tools) : [];
     return {
       model: this.name,
       messages: messages as Message[],
       stream: !!this.options.customResponse, // @todo explicit option?
-      tools: tools ? await toolList(tools) : undefined,
-      tool_choice: "auto"
+      ...(availableTools.length
+        ? { tools: availableTools, tool_choice: "auto" }
+        : {})
     };
   }
 
