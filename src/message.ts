@@ -243,6 +243,7 @@ export const callToolAndAppend = async <Memory extends ChatMemory>(
     message: ToolMessage;
     memPatch?: ChatMemoryPatch<Memory>;
   }[] = [];
+  let currentMemory = memory;
   for (const call of last.tool_calls) {
     const def = tools[call.function.name];
     if (!def) {
@@ -256,23 +257,22 @@ export const callToolAndAppend = async <Memory extends ChatMemory>(
       continue;
     }
     const { handler, tool } = typeof def === "function" ? await def() : def;
-    results.push(
-      await executeToolCall(
-        call,
-        handler,
-        tool.function.parameters,
-        memory,
-        mode
-      )
+    const result = await executeToolCall(
+      call,
+      handler,
+      tool.function.parameters,
+      currentMemory,
+      mode
     );
+    results.push(result);
+    if (result.memPatch) {
+      currentMemory = result.memPatch(currentMemory);
+    }
   }
 
   return {
     messages: [...messages, ...results.map((r) => r.message)],
-    memory: composePatches(
-      memory,
-      results.map((r) => r.memPatch)
-    )
+    memory: currentMemory
   };
 };
 
