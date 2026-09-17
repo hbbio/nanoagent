@@ -292,6 +292,8 @@ export interface CompletionRequestBase {
   user?: string;
   seed?: number;
   temperature?: number;
+  /** Ollama thinking toggle; omitted for other providers. */
+  think?: boolean;
 }
 
 /** Extras understood by the OpenAI HTTP endpoint. */

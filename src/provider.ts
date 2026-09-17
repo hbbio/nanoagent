@@ -31,10 +31,25 @@ export const ollama = (
   ...options
 });
 
-const mistralSmall = "mistral-small3.2";
-const devstral = "devstral";
-export const MistralSmall = ollama(mistralSmall);
-export const Devstral = ollama(devstral);
+// Latest 24B Mistral Small in Ollama's official library.
+export const MistralSmall = ollama("mistral-small3.2:24b");
+export const DevstralSmall2 = ollama("devstral-small-2:24b");
+export const Devstral2 = ollama("devstral-2:123b");
+export const Devstral = DevstralSmall2;
+
+export const Llama4Scout = ollama("llama4:16x17b");
+export const Llama4Maverick = ollama("llama4:128x17b");
+
+export const Gemma4Small = ollama("gemma4:e2b", { think: false });
+export const Gemma4Mid = ollama("gemma4:26b", { think: false });
+
+// Qwen 3.5 remains the current generation at the tiny and small sizes.
+export const Qwen35Tiny = ollama("qwen3.5:0.8b", { think: false });
+export const Qwen35TinyThink = ollama("qwen3.5:0.8b", { think: true });
+export const Qwen35Small = ollama("qwen3.5:4b", { think: false });
+export const Qwen38Mid = ollama("qwen3.8:27b", { think: false });
+
+/** Legacy versioned presets retain their original model IDs. */
 
 const llama32 = "llama3.2";
 export const Llama32 = ollama(llama32);
@@ -72,6 +87,11 @@ export const lms = (
 const qwen3_14b_mlx = "qwen3-14b-mlx";
 export const Qwen3MidMLX = lms(qwen3_14b_mlx, qwen3NoThink);
 
+/** Load Qwen3.8 27B MLX with this custom identifier in LM Studio. */
+export const Qwen38MidMLX = lms("qwen3.8-27b-mlx", {
+  removeThink: true
+});
+
 /** OpenAI */
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
@@ -94,6 +114,9 @@ export const chatgpt = (
 };
 
 export const ChatGPT6Astra = chatgpt("gpt-6-astra");
+export const ChatGPT56Sol = chatgpt("gpt-5.6-sol");
+export const ChatGPT56Terra = chatgpt("gpt-5.6-terra");
+export const ChatGPT56Luna = chatgpt("gpt-5.6-luna");
 
 /** Legacy versioned presets retain their original model IDs. */
 const gpt4o = "gpt-4o";

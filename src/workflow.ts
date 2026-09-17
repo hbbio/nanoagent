@@ -17,7 +17,7 @@ import { isTextContent } from "./content";
 import { stringify } from "./json";
 import { type Message, UserMessage } from "./message";
 import { ChatModel, type Model } from "./model";
-import { Gemma3Small } from "./provider";
+import { Gemma4Small } from "./provider";
 import type { ChatMemory, ToolRegistry } from "./tool";
 import { requestsUserInput } from "./yes";
 
@@ -245,7 +245,7 @@ export const sleep = (ms: number) =>
 export const loopAgent = async <Memory extends ChatMemory>(
   ctx: AgentContext<Memory>,
   initState: AgentState<Memory>,
-  options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma3Small) }
+  options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma4Small) }
 ): Promise<AgentState<Memory>> => {
   const logger = options.logger ?? console;
   let state = initState;
@@ -288,7 +288,7 @@ export class Sequence<Memory extends ChatMemory> {
   constructor(
     ctx: AgentContext<Memory>,
     state: AgentState<Memory>,
-    options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma3Small) }
+    options: SequenceOptions<Memory> = { yesModel: new ChatModel(Gemma4Small) }
   ) {
     this._ctx = ctx;
     this._state = state;

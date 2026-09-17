@@ -8,7 +8,7 @@ import {
   UserMessage
 } from "./message";
 import { ChatModel } from "./model";
-import { Llama32, Qwen3MidMLX } from "./provider";
+import { Qwen35Small, Qwen38MidMLX } from "./provider";
 import { content, tool } from "./tool";
 
 const weatherTool = "get_current_weather";
@@ -104,8 +104,8 @@ describe("OpenAI tool call (raw HTTP)", () => {
     expect(format).toBe("celsius");
   }, 10_000); // 10s timeout
 
-  it("should return a tool_call for get_current_weather (Qwen3MidMLX)", async () => {
-    const model = new ChatModel(Qwen3MidMLX);
+  it("should return a tool_call for get_current_weather (Qwen38MidMLX)", async () => {
+    const model = new ChatModel(Qwen38MidMLX);
     const { message } = (await model.invoke(
       await model.makeRequest(
         [UserMessage("What's the weather like in Tokyo in celsius?")],
@@ -133,8 +133,8 @@ describe("OpenAI tool call (raw HTTP)", () => {
     expect(format).toBe("celsius");
   }, 10_000); // 10s timeout
 
-  it("two round tool use (Llama32)", async () => {
-    const model = new ChatModel(Llama32);
+  it("two round tool use (Qwen35Small)", async () => {
+    const model = new ChatModel(Qwen35Small);
     // call the chat and automatically call the tool
     const input = [UserMessage("What's the weather like in Tokyo in celsius?")];
     const { messages } = await model.complete(input, { tools });
@@ -150,8 +150,8 @@ describe("OpenAI tool call (raw HTTP)", () => {
     expect(content).toContain("18");
   }, 10_000); // 10s timeout
 
-  it("two round tool use (Qwen3MidMLX)", async () => {
-    const model = new ChatModel(Qwen3MidMLX);
+  it("two round tool use (Qwen38MidMLX)", async () => {
+    const model = new ChatModel(Qwen38MidMLX);
     // call the chat and automatically call the tool
     const input = [UserMessage("What's the weather like in Tokyo in celsius?")];
     const { messages } = await model.complete(input, { tools });

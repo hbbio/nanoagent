@@ -3,13 +3,13 @@ import { describe, expect, it } from "bun:test";
 import { toContent, toText } from "./content";
 import { type Message, SystemMessage, UserMessage } from "./message";
 import { ChatModel, type CompleteOptions, type Model } from "./model";
-import { Gemma3Small, MistralSmall } from "./provider";
+import { Gemma4Small, MistralSmall } from "./provider";
 import type { ChatMemory } from "./tool";
 import type { AgentContext, AgentState } from "./workflow";
 import { runWorkflow, Sequence, stepAgent } from "./workflow";
 import { lastMessageIncludes } from "./yes";
 
-const yesModel = new ChatModel(Gemma3Small);
+const yesModel = new ChatModel(Gemma4Small);
 
 describe("Sequence Chaining", () => {
   it(

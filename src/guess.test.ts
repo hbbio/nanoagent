@@ -3,7 +3,7 @@ import { describe, expect, it } from "bun:test";
 import { textIncludes } from "./content";
 import { SystemMessage, UserMessage } from "./message";
 import { ChatModel } from "./model";
-import { Qwen3MidMLX } from "./provider";
+import { Qwen38MidMLX } from "./provider";
 import { content, error, ToolRegistry, tool } from "./tool";
 import { type AgentContext, type AgentState, loopAgent } from "./workflow";
 
@@ -110,11 +110,11 @@ describe("guessing game", () => {
   );
 
   it(
-    "stores the number in memory and repeatedly makes guesses until success (Qwen3MidMLX)",
+    "stores the number in memory and repeatedly makes guesses until success (Qwen38MidMLX)",
     async () => {
       const run = await loopAgent(
         context,
-        initialState(new ChatModel(Qwen3MidMLX))
+        initialState(new ChatModel(Qwen38MidMLX))
       );
       console.log(run.messages);
       expect(run.messages.length).toBeGreaterThan(4);

@@ -75,7 +75,8 @@ export const makeResponsesRequest = (
     "seed",
     "presence_penalty",
     "frequency_penalty",
-    "logit_bias"
+    "logit_bias",
+    "think"
   ] as const) {
     if (chat[key] !== undefined)
       throw new Error(

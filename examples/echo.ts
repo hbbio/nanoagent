@@ -3,14 +3,14 @@ import {
   type AgentState,
   type ChatMemory,
   ChatModel,
-  Llama32,
-  SystemMessage,
-  ToolRegistry,
-  UserMessage,
   content,
   lastMessageIncludes,
   loopAgent,
-  tool
+  Qwen35Small,
+  SystemMessage,
+  ToolRegistry,
+  tool,
+  UserMessage
 } from "../src";
 
 // 1) a trivial tool
@@ -33,7 +33,7 @@ const ctx: AgentContext<ChatMemory> = {
 
 // 3) initial state
 const init: AgentState<ChatMemory> = {
-  model: new ChatModel(Llama32),
+  model: new ChatModel(Qwen35Small),
   messages: [
     SystemMessage(
       "You must call the `echo` tool once. Reply very concisely and NEVER ASK any further question to the user!"

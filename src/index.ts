@@ -47,10 +47,19 @@ export {
   ChatGPT41,
   ChatGPT41Mini,
   ChatGPT41Nano,
+  ChatGPT56Luna,
+  ChatGPT56Sol,
+  ChatGPT56Terra,
   chatgpt,
   Devstral,
+  Devstral2,
+  DevstralSmall2,
   Gemma3Mid,
   Gemma3Small,
+  Gemma4Mid,
+  Gemma4Small,
+  Llama4Maverick,
+  Llama4Scout,
   Llama32,
   lms,
   MistralSmall,
@@ -60,7 +69,12 @@ export {
   Qwen3MidMLX,
   Qwen3Small,
   Qwen3Tiny,
-  Qwen3TinyThink
+  Qwen3TinyThink,
+  Qwen35Small,
+  Qwen35Tiny,
+  Qwen35TinyThink,
+  Qwen38Mid,
+  Qwen38MidMLX
 } from "./provider";
 export {
   applySchema,

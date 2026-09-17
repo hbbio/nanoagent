@@ -249,6 +249,7 @@ export interface ChatModelOptions {
   stringifyArguments?: boolean;
   stringifyContent?: boolean;
   temperature?: number;
+  think?: boolean;
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   removeThink?: boolean;
   noThinkPrompt?: string;
@@ -273,14 +274,29 @@ export interface Model {
 export const OLLAMA_URL: string;
 export const ollama : (name: string, opts?: Partial<ChatModelOptions>) => ChatModelOptions;
 export const chatgpt: (name: string, opts?: Partial<ChatModelOptions>) => ChatModelOptions;
-
 export const lms: (name: string, opts?: Partial<ChatModelOptions>) => ChatModelOptions;
-
 export const openrouter: (name: string, opts?: Partial<ChatModelOptions>) => ChatModelOptions;
 
-/* provider.ts presets */
+/* provider.ts presets, verified 2026-09-17 */
 export const ChatGPT6Astra: ChatModelOptions;  // gpt-6-astra, Responses API
+export const ChatGPT56Sol: ChatModelOptions;
+export const ChatGPT56Terra: ChatModelOptions;
+export const ChatGPT56Luna: ChatModelOptions;
+export const Qwen35Tiny: ChatModelOptions;     // qwen3.5:0.8b, think: false
+export const Qwen35TinyThink: ChatModelOptions;
+export const Qwen35Small: ChatModelOptions;    // qwen3.5:4b, think: false
+export const Qwen38Mid: ChatModelOptions;      // qwen3.8:27b, think: false
+export const Qwen38MidMLX: ChatModelOptions;   // LM Studio custom ID: qwen3.8-27b-mlx
+export const Gemma4Small: ChatModelOptions;    // gemma4:e2b, think: false
+export const Gemma4Mid: ChatModelOptions;      // gemma4:26b, think: false
+export const Llama4Scout: ChatModelOptions;
+export const Llama4Maverick: ChatModelOptions;
+export const DevstralSmall2: ChatModelOptions;
+export const Devstral2: ChatModelOptions;
+export const Devstral: ChatModelOptions;       // alias for DevstralSmall2
 export const Nemotron3UltraFree: ChatModelOptions;
+
+/* Legacy versioned presets still select their original generations. */
 export const Llama32      : ChatModelOptions;
 export const Gemma3Small  : ChatModelOptions;
 export const Gemma3Mid    : ChatModelOptions;
@@ -296,7 +312,7 @@ export const removeThinkSection: (s: string) => string;
 
 /* main class */
 export class ChatModel implements Model {
-  constructor(opts?: ChatModelOptions);          // default MistralSmall
+  constructor(opts?: ChatModelOptions);          // default Qwen35Small
   stop(): Promise<void>;                         // abort streaming
   /* internal helpers: invoke(), makeRequest() are also public */
 }

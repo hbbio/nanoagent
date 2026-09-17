@@ -21,7 +21,7 @@ import {
   type Message,
   type ToolCall
 } from "./message";
-import { Qwen3Small } from "./provider";
+import { Qwen35Small } from "./provider";
 import { makeResponsesRequest, parseResponse } from "./responses";
 import { type ChatMemory, type Tools, toolList } from "./tool";
 
@@ -50,6 +50,8 @@ export interface ChatModelOptions {
   stringifyContent?: boolean;
   /** Override temperature for all messages */
   temperature?: number;
+  /** Enable or disable reasoning on Ollama models that support thinking. */
+  think?: boolean;
   /** Reasoning effort for the Responses API. */
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max";
   /** Remove thinking */
@@ -125,7 +127,7 @@ export class ChatModel implements Model {
   private readonly adder: ChatMessageAdder;
   private _abortCtl: AbortController | null = null;
 
-  constructor({ adder, ...opts }: ChatModelOptions = Qwen3Small) {
+  constructor({ adder, ...opts }: ChatModelOptions = Qwen35Small) {
     this.options = opts;
     const { url, name, key } = opts;
     this.url = url;
@@ -220,6 +222,7 @@ export class ChatModel implements Model {
         : {
             ...chat,
             temperature: chat.temperature ?? this.options.temperature,
+            think: chat.think ?? this.options.think,
             messages: this._formatMessages(chat.messages)
           };
     if (this._abortCtl) this._abortCtl.abort();
