@@ -35,7 +35,7 @@ export const ollama = (
   ...options
 });
 
-const mistralSmall = "mistral-small3.1";
+const mistralSmall = "mistral-small3.2";
 const devstral = "devstral";
 export const MistralSmall = ollama(mistralSmall);
 export const Devstral = ollama(devstral);
