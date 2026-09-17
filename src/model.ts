@@ -37,11 +37,13 @@ export interface ChatModelOptions {
   name: string;
   /** Optional bearer token used for `Authorization: Bearer …`. */
   key?: string;
+  /** Additional HTTP headers, e.g. OpenRouter app attribution. */
+  headers?: Record<string, string>;
   /** Optional custom message‐adder used to merge assistant replies. */
   adder?: ChatMessageAdder;
   /** Tool arguments must be stringified (OpenAI) */
   stringifyArguments?: boolean;
-  /** Messages content should be stringified (ollama) */
+  /** Serialize message content as text for chat-completion providers. */
   stringifyContent?: boolean;
   /** Override temperature for all messages */
   temperature?: number;
@@ -128,15 +130,36 @@ export class ChatModel implements Model {
   }
 
   private _formatMessages(messages: readonly Message[]) {
-    if (!this.options.stringifyContent) return messages;
+    if (!this.options.stringifyContent && !this.options.stringifyArguments)
+      return messages;
     return messages.map((msg, i) => ({
       ...msg,
-      content: msg.content
-        ? toText(msg.content) +
-          (i === messages.length - 1 && this.options?.removeThink
-            ? this.options?.noThinkPrompt || ""
-            : "")
-        : null
+      ...(this.options.stringifyContent
+        ? {
+            content: msg.content
+              ? toText(msg.content) +
+                (i === messages.length - 1 && this.options.removeThink
+                  ? this.options.noThinkPrompt || ""
+                  : "")
+              : null
+          }
+        : {}),
+      ...(this.options.stringifyArguments &&
+      msg.role === "assistant" &&
+      msg.tool_calls
+        ? {
+            tool_calls: msg.tool_calls.map((call) => ({
+              ...call,
+              function: {
+                ...call.function,
+                arguments:
+                  typeof call.function.arguments === "string"
+                    ? call.function.arguments
+                    : JSON.stringify(call.function.arguments)
+              }
+            }))
+          }
+        : {})
     }));
   }
 
@@ -184,10 +207,10 @@ export class ChatModel implements Model {
     if (this._abortCtl) this._abortCtl.abort();
     this._abortCtl = new AbortController();
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json; charset=utf-8"
-    };
-    if (this.key) headers.Authorization = `Bearer ${this.key}`;
+    const headers = new Headers(this.options.headers);
+    if (!headers.has("Content-Type"))
+      headers.set("Content-Type", "application/json; charset=utf-8");
+    if (this.key) headers.set("Authorization", `Bearer ${this.key}`);
 
     const request = {
       ...chat,
@@ -253,12 +276,14 @@ export class ChatModel implements Model {
     messages: readonly Message[],
     tools?: Tools<Memory>
   ): Promise<CompletionRequest> {
+    const availableTools = tools ? await toolList(tools) : [];
     return {
       model: this.name,
       messages: messages as Message[],
       stream: !!this.options.customResponse, // @todo explicit option?
-      tools: tools ? await toolList(tools) : undefined,
-      tool_choice: "auto"
+      ...(availableTools.length
+        ? { tools: availableTools, tool_choice: "auto" }
+        : {})
     };
   }
 

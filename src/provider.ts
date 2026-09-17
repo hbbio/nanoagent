@@ -91,3 +91,28 @@ export const ChatGPT4o = chatgpt(gpt4o);
 export const ChatGPT41 = chatgpt(gpt41);
 export const ChatGPT41Mini = chatgpt(gpt41mini);
 export const ChatGPT41Nano = chatgpt(gpt41nano);
+
+/** OpenRouter */
+
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+
+/**
+ * Configure an OpenRouter model by its exact ID;
+ * include the `:free` suffix to select a free variant.
+ */
+export const openrouter = (
+  name: string,
+  options?: Partial<ChatModelOptions>
+): ChatModelOptions => ({
+  url: OPENROUTER_URL,
+  name,
+  key: isNode ? process.env.OPENROUTER_API_KEY : undefined,
+  stringifyContent: true,
+  stringifyArguments: true,
+  ...options
+});
+
+/** NVIDIA Nemotron 3 Ultra's free variant on OpenRouter. */
+export const Nemotron3UltraFree = openrouter(
+  "nvidia/nemotron-3-ultra-550b-a55b:free"
+);

@@ -6,8 +6,8 @@
 
 **NanoAgent** is a micro‑framework (≈ 1 kLOC) for running LLM‑powered agents
 in pure TypeScript **with zero runtime dependencies** outside of
-[bun](https://bun.sh). You only need your favorite chat models: OpenAI, or a
-local engine like Ollama.
+[bun](https://bun.sh). You only need your favorite chat models: OpenAI,
+OpenRouter, or a local engine like Ollama.
 
 > **Why another agent runtime?**  
 > [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
@@ -185,7 +185,7 @@ bun add nanoagent   # or:  npm i nanoagent  pnpm add nanoagent  yarn add nanoage
 The package is published as **ES 2020 modules with type‑definitions
 included**.
 
-## Using OpenAI or Ollama
+## Using OpenAI, OpenRouter or Ollama
 
 ### OpenAI
 
@@ -202,6 +202,61 @@ const model = new ChatModel(ChatGPT4o);
 
 or one of the predefined model names. Call any present or future model using
 `chatgpt("name")`.
+
+### OpenRouter (including free models)
+
+Create an [OpenRouter API key](https://openrouter.ai/settings/keys), then set:
+
+```bash
+export OPENROUTER_API_KEY=...
+```
+
+Pass an exact model ID, including `:free` for a free variant such as
+[NVIDIA Nemotron 3 Ultra](https://openrouter.ai/nvidia/nemotron-3-ultra-550b-a55b:free):
+
+```ts
+import { ChatModel, openrouter, toText, UserMessage } from "@hbbio/nanoagent";
+
+const model = new ChatModel(openrouter("nvidia/nemotron-3-ultra-550b-a55b:free"));
+const { messages } = await model.complete([UserMessage("Hello!")]);
+console.log(toText(messages.at(-1)?.content));
+```
+
+The `Nemotron3UltraFree` preset is also available:
+`new ChatModel(Nemotron3UltraFree)`. Like the other presets, it reads its key at
+module import; `openrouter(name)` reads the environment when called.
+
+Pass an exact OpenRouter model ID to select a particular model, including
+an available `:free` variant: `openrouter("provider/model:free")`. Use an
+ID from the [current free-model catalog](https://openrouter.ai/models?max_price=0);
+`provider/model:free` is a placeholder, and not every model has a free
+variant. Paid model IDs work with the same helper.
+
+You can also pass an explicit key, temperature, or optional app attribution:
+
+```ts
+const model = new ChatModel(openrouter("nvidia/nemotron-3-ultra-550b-a55b:free", {
+  key: process.env.OPENROUTER_API_KEY,
+  temperature: 0.5,
+  headers: {
+    "HTTP-Referer": "https://your-app.example",
+    "X-OpenRouter-Title": "My agent",
+  },
+}));
+```
+
+Tool calls work through the existing `tools` option and agent workflows.
+Pass the tool registry on each `complete` call, including turns containing
+tool results. Nemotron 3 Ultra supports tool calling; when selecting another
+model, check its tool-calling support.
+
+For `loopAgent` or `Sequence`, also set `options.yesModel` to an OpenRouter
+`ChatModel` to run the loop's control checks remotely; its default uses
+Ollama.
+
+Free models still require an API key and are subject to availability and
+[rate limits](https://openrouter.ai/docs/api/reference/limits). NanoAgent
+surfaces API errors without automatically switching to a paid model.
 
 ### Ollama
 
