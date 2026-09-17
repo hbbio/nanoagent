@@ -2,7 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import { textIncludes } from "./content";
 import { SystemMessage, UserMessage } from "./message";
-import { ChatModel, Qwen3MidMLX } from "./model";
+import { ChatModel } from "./model";
+import { Qwen3MidMLX } from "./provider";
 import { content, error, ToolRegistry, tool } from "./tool";
 import { type AgentContext, type AgentState, loopAgent } from "./workflow";
 

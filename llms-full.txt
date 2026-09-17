@@ -268,7 +268,9 @@ export const OLLAMA_URL: string;
 export const ollama : (name: string, opts?: Partial<ChatModelOptions>) => ChatModelOptions;
 export const chatgpt: (name: string) => ChatModelOptions;
 
-/* ready-made presets */
+export const lms: (name: string, opts?: Partial<ChatModelOptions>) => ChatModelOptions;
+
+/* provider.ts presets */
 export const Llama32      : ChatModelOptions;
 export const Gemma3Small  : ChatModelOptions;
 export const Gemma3Mid    : ChatModelOptions;

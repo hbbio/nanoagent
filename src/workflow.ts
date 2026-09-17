@@ -16,7 +16,8 @@
 import { isTextContent } from "./content";
 import { stringify } from "./json";
 import { type Message, UserMessage } from "./message";
-import { ChatModel, Gemma3Small, type Model } from "./model";
+import { ChatModel, type Model } from "./model";
+import { Gemma3Small } from "./provider";
 import type { ChatMemory, ToolRegistry } from "./tool";
 import { requestsUserInput } from "./yes";
 

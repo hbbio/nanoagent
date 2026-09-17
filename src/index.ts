@@ -33,28 +33,31 @@ export {
   UserMessage
 } from "./message";
 export {
-  ChatGPT4o,
-  ChatGPT41,
-  ChatGPT41Mini,
-  ChatGPT41Nano,
   type ChatMessageAdder,
   ChatModel,
   type ChatModelOptions,
   type CompleteOptions,
+  defaultAdder,
+  type Model
+} from "./model";
+export {
+  ChatGPT4o,
+  ChatGPT41,
+  ChatGPT41Mini,
+  ChatGPT41Nano,
   chatgpt,
   Devstral,
-  defaultAdder,
   Gemma3Mid,
   Gemma3Small,
   Llama32,
+  lms,
   MistralSmall,
-  type Model,
   ollama,
   Qwen3MidMLX,
   Qwen3Small,
   Qwen3Tiny,
   Qwen3TinyThink
-} from "./model";
+} from "./provider";
 export {
   applySchema,
   type JSONSchemaArray,

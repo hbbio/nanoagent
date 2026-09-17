@@ -2,13 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import { toContent, toText } from "./content";
 import { type Message, SystemMessage, UserMessage } from "./message";
-import {
-  ChatModel,
-  type CompleteOptions,
-  Gemma3Small,
-  MistralSmall,
-  type Model
-} from "./model";
+import { ChatModel, type CompleteOptions, type Model } from "./model";
+import { Gemma3Small, MistralSmall } from "./provider";
 import type { ChatMemory } from "./tool";
 import type { AgentContext, AgentState } from "./workflow";
 import { runWorkflow, Sequence, stepAgent } from "./workflow";

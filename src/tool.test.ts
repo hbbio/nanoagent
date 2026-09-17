@@ -7,7 +7,8 @@ import {
   type ToolCall,
   UserMessage
 } from "./message";
-import { ChatModel, Llama32, Qwen3MidMLX } from "./model";
+import { ChatModel } from "./model";
+import { Llama32, Qwen3MidMLX } from "./provider";
 import { content, tool } from "./tool";
 
 const weatherTool = "get_current_weather";
