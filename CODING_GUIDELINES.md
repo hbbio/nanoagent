@@ -53,11 +53,15 @@ These guidelines define the baseline quality expected in all code contributions.
 
 ### ✅ Linting & Formatting
 
-10. **All code must pass [`biome`](https://biomejs.dev/) (v1.9.4+)**
+10. **All code must pass the system [`biome`](https://biomejs.dev/) (v2.6+)**
     - No unused variables.
     - No `any` unless justified with a comment.
     - Proper indentation and whitespace.
     - Sorted keys in objects where appropriate.
+
+    Use system Bun 1.4+, Biome 2.6+, and TypeScript 7+ from `PATH`.
+    Keep package dependencies empty; runtime and test declarations live in
+    `types/`. TypeDoc is optional and only needed to generate API docs.
 
 11. **No top-level async/await unless in ESM environments**
     - Use `void (async () => { ... })()` if needed.
