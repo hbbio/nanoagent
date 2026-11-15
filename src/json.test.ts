@@ -85,4 +85,35 @@ describe("stringify", () => {
     obj.self = obj;
     expect(() => stringify(obj)).toThrow(TypeError);
   });
+
+  it("stringify_rejectsCircularArrays", () => {
+    const array: unknown[] = [];
+    array.push(array);
+
+    expect(() => stringify(array)).toThrow(TypeError);
+  });
+
+  it("stringify_omitsCircularArrayReferencesInNoFailMode", () => {
+    const array: unknown[] = [1];
+    array.push(array);
+
+    expect(JSON.parse(stringify(array, { noFail: true }))).toEqual([1, null]);
+  });
+
+  it("stringify_detectsArrayCyclesThroughObjects", () => {
+    const array: unknown[] = [];
+    array.push({ parent: array });
+
+    expect(() => stringify(array)).toThrow(TypeError);
+    expect(JSON.parse(stringify(array, { noFail: true }))).toEqual([{}]);
+  });
+
+  it("stringify_preservesRepeatedNonCircularArrays", () => {
+    const shared = [1, 2];
+
+    expect(JSON.parse(stringify([shared, shared]))).toEqual([
+      [1, 2],
+      [1, 2]
+    ]);
+  });
 });
