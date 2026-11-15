@@ -25,7 +25,7 @@ jobs:
       - name: Run unit tests
         run: bun run test
 
-      - name: Build JavaScript and declarations without packages
+      - name: Build and check public declarations without packages
         run: |
-          bun run build
+          bun run test:types
           test ! -d node_modules

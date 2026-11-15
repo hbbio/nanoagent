@@ -155,6 +155,16 @@ const tools = {
 serveMCP(new ToolRegistry(tools), 3123); // → http://localhost:3123/v1/…
 ```
 
+`serveMCP` returns the original Bun server handle, typed as `MCPServer`.
+Its URL, request metrics, lifecycle methods, and request controls remain
+available without installing `@types/bun`:
+
+```ts
+const server = serveMCP(new ToolRegistry(tools), 0);
+console.log(server.url, server.pendingRequests);
+server.unref();
+```
+
 ### Calling remote tools from an agent
 
 ```ts
@@ -211,10 +221,11 @@ declarations in `types/` for the Bun runtime and test APIs it uses, so
 `@types/bun` and `@types/node` are unnecessary.
 
 ```bash
-bun run lint    # Biome checks and TypeScript type checking
-bun run test    # Unit tests and local MCP tests; no model service needed
-bun run build   # JavaScript bundle and declarations in dist/
-bun run format  # Apply Biome formatting and safe lint fixes
+bun run lint        # Biome checks and TypeScript type checking
+bun run test        # Unit tests and local MCP tests; no model service needed
+bun run build       # JavaScript bundle and declarations in dist/
+bun run test:types  # Build and check public declarations as a consumer
+bun run format      # Apply Biome formatting and safe lint fixes
 ```
 
 `bun run test:integration` runs the tests that need local Ollama and

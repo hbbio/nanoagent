@@ -86,6 +86,12 @@ export {
   type TypedSchema,
   typedSchema
 } from "./schema";
+export type {
+  MCPServer,
+  MCPServerReloadOptions,
+  MCPServerWebSocket,
+  MCPServerWebSocketHandler
+} from "./server";
 export {
   type ChatMemory,
   type ChatMemoryPatch,

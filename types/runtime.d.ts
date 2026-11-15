@@ -4,13 +4,10 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
-/** Keep the server handle structural so emitted declarations need no Bun types. */
+/** Use the public server contract for both runtime checks and emitted types. */
 declare const Bun: {
   serve(options: {
     port?: number;
     fetch(request: Request): Response | Promise<Response>;
-  }): {
-    readonly port: number;
-    stop(closeActiveConnections?: boolean): Promise<void>;
-  };
+  }): import("../src/server").MCPServer;
 };
