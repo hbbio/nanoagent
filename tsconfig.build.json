@@ -10,7 +10,5 @@
     "composite": false,
     "incremental": false
   },
-  "include": [
-    "src/index.ts"
-  ]
+  "include": ["src/index.ts", "types/runtime.d.ts"]
 }

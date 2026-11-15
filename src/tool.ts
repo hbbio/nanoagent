@@ -222,7 +222,7 @@ export class ToolRegistry<Memory extends ChatMemory> {
     memory: Memory
   ): Promise<ToolCallResponse<Memory, Out>> {
     const entry = this._tools[name];
-    if (!entry) throw new Error(`Tool \"${name}\" not found`);
+    if (!entry) throw new Error(`Tool "${name}" not found`);
     const { handler } = typeof entry === "function" ? await entry() : entry;
     return handler(args, memory);
   }

@@ -258,7 +258,7 @@ export const callToolAndAppend = async <Memory extends ChatMemory>(
         message: {
           role: "tool",
           tool_call_id: call.id,
-          content: text(`No handler for tool \"${call.function.name}\"`)
+          content: text(`No handler for tool "${call.function.name}"`)
         }
       });
       continue;

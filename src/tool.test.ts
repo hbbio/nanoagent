@@ -94,7 +94,7 @@ describe("OpenAI tool call (raw HTTP)", () => {
     const { location, format } =
       tool && "arguments" in tool
         ? typeof tool.arguments === "object"
-          ? (tool?.arguments as {
+          ? (tool.arguments as {
               location: string;
               format: string;
             })
@@ -123,7 +123,7 @@ describe("OpenAI tool call (raw HTTP)", () => {
     const { location, format } =
       tool && "arguments" in tool
         ? typeof tool.arguments === "object"
-          ? (tool?.arguments as {
+          ? (tool.arguments as {
               location: string;
               format: string;
             })

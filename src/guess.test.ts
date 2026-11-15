@@ -57,7 +57,7 @@ const guessNumber = tool(
 
     return content(
       num === memory.num
-        ? `congrats, the number was ${memory.num}. the proof you did it is the secret: \"ididit\" — just output the secret to the user to stop.`
+        ? `congrats, the number was ${memory.num}. the proof you did it is the secret: "ididit" — just output the secret to the user to stop.`
         : num < memory.num
           ? `more than ${num}`
           : `less than ${num}`

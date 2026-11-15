@@ -5,9 +5,9 @@
 # NanoAgent
 
 **NanoAgent** is a micro‑framework (≈ 1 kLOC) for running LLM‑powered agents
-in pure TypeScript **with zero runtime dependencies** outside of
-[bun](https://bun.sh). You only need your favorite chat models: OpenAI,
-OpenRouter, or a local engine like Ollama.
+in pure TypeScript **with zero npm dependencies**. It runs on a system
+install of [Bun 1.4+](https://bun.com). You only need your favorite chat
+models: OpenAI, OpenRouter, or a local engine like Ollama.
 
 > **Why another agent runtime?**  
 > [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)
@@ -179,11 +179,64 @@ const ctx = {
 ## Installation
 
 ```bash
-bun add nanoagent   # or:  npm i nanoagent  pnpm add nanoagent  yarn add nanoagent
+bun add @hbbio/nanoagent
 ```
 
-The package is published as **ES 2020 modules with type‑definitions
-included**.
+The package ships JavaScript ES modules and TypeScript declarations, with
+no runtime, development, or peer npm dependencies. Installing NanoAgent
+does not install any other packages.
+
+## Development with system tools
+
+Install these commands on your system and put them on `PATH`:
+
+| Command | Required version | Purpose |
+| --- | --- | --- |
+| `bun` | 1.4+ | Run agents, tests, and the JavaScript bundler |
+| `biome` | 2.6+ | Lint and format source and local type declarations |
+| `tsc` | 7+ | Check types and emit declarations |
+
+For example, with [Homebrew](https://brew.sh):
+
+```bash
+brew install bun biome typescript
+bun --version
+biome --version
+tsc --version
+```
+
+A fresh checkout needs **no `bun install`, `npm install`, or `node_modules`
+directory**. The project uses TypeScript's standard web types and small
+declarations in `types/` for the Bun runtime and test APIs it uses, so
+`@types/bun` and `@types/node` are unnecessary.
+
+```bash
+bun run lint    # Biome checks and TypeScript type checking
+bun run test    # Unit tests and local MCP tests; no model service needed
+bun run build   # JavaScript bundle and declarations in dist/
+bun run format  # Apply Biome formatting and safe lint fixes
+```
+
+`bun run test:integration` runs the tests that need local Ollama and
+LM Studio services and models. `bun test` runs all tests, including those
+integrations. CI and the publish checks use `bun run test`.
+
+### Optional API documentation
+
+TypeDoc is optional. Running, checking, testing, building, and packaging
+NanoAgent do not need it. To generate API docs, install TypeDoc separately
+on your system, then run:
+
+```bash
+bun install --global typedoc@0.28.3
+bun run docs
+```
+
+This optional install brings TypeDoc's own npm dependencies, including its
+compatible TypeScript compiler; the project's checks and builds use the
+system TypeScript 7 compiler. Generated docs go to `docs/`. The GitHub Pages
+workflow is manual (`workflow_dispatch`) and installs these optional tools
+only when requested.
 
 ## Using OpenAI, OpenRouter, Ollama or LM Studio
 
