@@ -32,11 +32,17 @@ export const stringify = (
 
     if (Array.isArray(val)) {
       if (val.length === 0) return "[]";
+      if (seen.has(val)) {
+        if (options?.noFail) return serialize(undefined, level);
+        throw new TypeError("Converting circular structure to JSON");
+      }
+      seen.add(val);
       const nextLevel = level + 1;
       const items = val.map((el) => {
         const out = serialize(el, nextLevel);
         return `${indentUnit.repeat(nextLevel)}${out ?? "null"}`;
       });
+      seen.delete(val);
       return `[\n${items.join(",\n")}\n${indentUnit.repeat(level)}]`;
     }
 

@@ -1,4 +1,4 @@
-# dependencies (bun install)
+# Local packages are optional; the project uses system tools.
 node_modules
 
 # output

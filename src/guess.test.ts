@@ -2,7 +2,8 @@ import { describe, expect, it } from "bun:test";
 
 import { textIncludes } from "./content";
 import { SystemMessage, UserMessage } from "./message";
-import { ChatModel, Qwen3MidMLX } from "./model";
+import { ChatModel } from "./model";
+import { Qwen38MidMLX } from "./provider";
 import { content, error, ToolRegistry, tool } from "./tool";
 import { type AgentContext, type AgentState, loopAgent } from "./workflow";
 
@@ -56,7 +57,7 @@ const guessNumber = tool(
 
     return content(
       num === memory.num
-        ? `congrats, the number was ${memory.num}. the proof you did it is the secret: \"ididit\" — just output the secret to the user to stop.`
+        ? `congrats, the number was ${memory.num}. the proof you did it is the secret: "ididit" — just output the secret to the user to stop.`
         : num < memory.num
           ? `more than ${num}`
           : `less than ${num}`
@@ -109,11 +110,11 @@ describe("guessing game", () => {
   );
 
   it(
-    "stores the number in memory and repeatedly makes guesses until success (Qwen3MidMLX)",
+    "stores the number in memory and repeatedly makes guesses until success (Qwen38MidMLX)",
     async () => {
       const run = await loopAgent(
         context,
-        initialState(new ChatModel(Qwen3MidMLX))
+        initialState(new ChatModel(Qwen38MidMLX))
       );
       console.log(run.messages);
       expect(run.messages.length).toBeGreaterThan(4);

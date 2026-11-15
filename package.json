@@ -17,20 +17,14 @@
   ],
   "scripts": {
     "build": "bun build src/index.ts --outdir dist && tsc --project tsconfig.build.json",
-    "check": "biome check src",
+    "check": "biome check src types test package.json biome.json tsconfig.json tsconfig.build.json",
     "lint": "bun run check && tsc --noEmit",
-    "format": "biome format src --write && biome check src --write",
-    "formatReadme": "prettier README.md --prose-wrap always --print-width 78 -w",
-    "docs": "typedoc --entryPoints src/ --out docs/",
-    "prepublishOnly": "bun run lint && bun run build && bun test"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.1.2",
-    "@types/bun": "latest",
-    "typedoc": "^0.28.3"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "format": "biome check src types test package.json biome.json tsconfig.json tsconfig.build.json --write",
+    "test": "bun test src/provider.test.ts src/openrouter.test.ts src/responses.test.ts src/json.test.ts src/schema.test.ts src/message.test.ts src/mcp.test.ts",
+    "test:integration": "bun test src/tool.test.ts src/guess.test.ts src/workflow.test.ts",
+    "test:types": "bun run build && tsc --project test/types/tsconfig.json",
+    "docs": "typedoc --entryPoints src/index.ts --out docs/",
+    "prepublishOnly": "bun run lint && bun run test:types && bun run test"
   },
   "author": {
     "name": "Henri Binsztok"
@@ -41,6 +35,6 @@
   },
   "license": "MIT",
   "engines": {
-    "bun": ">=1.2.0"
+    "bun": ">=1.4.0"
   }
 }
