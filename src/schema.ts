@@ -186,6 +186,11 @@ const validateBounds = (
   if (schema.type === "array" && Array.isArray(value)) {
     return value.every((item) => validateBounds(item, schema.items));
   }
+  if (schema.type === "object" && isPlainObject(value)) {
+    return Object.entries(schema.properties).every(([key, property]) =>
+      validateBounds(value[key], property)
+    );
+  }
   if (
     typeof value !== "number" ||
     (schema.type !== "number" && schema.type !== "integer")

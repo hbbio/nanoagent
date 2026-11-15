@@ -167,3 +167,49 @@ it("validates bounds on numeric array items", () => {
   );
   expect(applySchema(arraySchema, { values: [0, 1] }).values).toEqual([0, 1]);
 });
+
+describe("numeric bounds in objects inside nested arrays", () => {
+  for (const type of ["number", "integer"] as const) {
+    const NESTED_SCHEMA = {
+      type: "object",
+      properties: {
+        rows: {
+          type: "array",
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                score: { type, minimum: 0, maximum: 10 },
+                nested: {
+                  type: "object",
+                  properties: { score: { type, minimum: 0, maximum: 10 } }
+                }
+              }
+            }
+          }
+        }
+      }
+    } satisfies TypedSchema<{
+      rows: { score?: number; nested?: { score: number } }[][];
+    }>;
+
+    for (const score of [-1, 11]) {
+      it(`applySchema_rejectsNestedArrayObject_${type}_${score}`, () => {
+        expect(() =>
+          applySchema(NESTED_SCHEMA, { rows: [[{ score }]] })
+        ).toThrow(/outside numeric bounds/);
+        expect(() =>
+          applySchema(NESTED_SCHEMA, { rows: [[{ nested: { score } }]] })
+        ).toThrow(/outside numeric bounds/);
+      });
+    }
+
+    it(`applySchema_acceptsNestedArrayBoundaries_${type}`, () => {
+      const rows = [
+        [{ score: 0 }, { score: 10 }, { nested: { score: 5 } }, {}]
+      ];
+      expect(applySchema(NESTED_SCHEMA, { rows }).rows).toEqual(rows);
+    });
+  }
+});
