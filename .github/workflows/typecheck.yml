@@ -1,4 +1,4 @@
-name: TypeCheck
+name: Check
 
 on:
   push:
@@ -7,19 +7,25 @@ on:
 
 jobs:
   check-types:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-
-      - name: Install dependencies
+      - name: Install system tools
         run: |
-          bun install
-          bun add -d typescript@5  # install ts locally for CI (peerDep)
+          brew install bun biome typescript
+          bun --version
+          biome --version
+          tsc --version
 
-      - name: Check TypeScript types
+      - name: Lint and check TypeScript types
+        run: bun run lint
+
+      - name: Run unit tests
+        run: bun run test
+
+      - name: Build and check public declarations without packages
         run: |
-          npx tsc --noEmit --pretty
+          bun run test:types
+          test ! -d node_modules

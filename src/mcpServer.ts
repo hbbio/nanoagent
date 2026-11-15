@@ -1,3 +1,4 @@
+import type { MCPServer } from "./server";
 import {
   type ChatMemory,
   type ChatMemoryPatch,
@@ -9,7 +10,7 @@ import {
 export const serveMCP = <Memory extends ChatMemory>(
   toolRegistry: ToolRegistry<Memory>,
   port = 3000
-) => {
+): MCPServer => {
   const server = Bun.serve({
     port,
     async fetch(req) {
