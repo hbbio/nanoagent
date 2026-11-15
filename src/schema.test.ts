@@ -115,3 +115,101 @@ describe("applySchema", () => {
     expect(result).not.toHaveProperty("extra");
   });
 });
+
+describe("numeric bounds", () => {
+  const boundedSchema = {
+    type: "object",
+    properties: {
+      value: { type: "number", minimum: 0, maximum: 10 }
+    }
+  } satisfies TypedSchema<{ value?: number | string }>;
+
+  for (const value of [-1, 11, "-1", "11"]) {
+    it(`rejects out-of-range value ${value}`, () => {
+      expect(() => applySchema(boundedSchema, { value })).toThrow(
+        /Invalid value for property 'value'/
+      );
+    });
+  }
+
+  for (const value of [0, 10, "0", "10", 5]) {
+    it(`accepts in-range value ${value}`, () => {
+      expect(applySchema(boundedSchema, { value }).value).toBe(Number(value));
+    });
+  }
+
+  it("preserves optional numeric values", () => {
+    expect(applySchema(boundedSchema, {}).value).toBeUndefined();
+  });
+
+  it("validates bounds inside nested objects", () => {
+    const nestedSchema = {
+      type: "object",
+      properties: {
+        nested: boundedSchema
+      }
+    } satisfies TypedSchema<{ nested: { value: number } }>;
+    expect(() => applySchema(nestedSchema, { nested: { value: -1 } })).toThrow(
+      /Invalid value for property 'value'/
+    );
+  });
+});
+
+it("validates bounds on numeric array items", () => {
+  const arraySchema = {
+    type: "object",
+    properties: {
+      values: { type: "array", items: { type: "integer", minimum: 0 } }
+    }
+  } satisfies TypedSchema<{ values: number[] }>;
+  expect(() => applySchema(arraySchema, { values: [1, -1] })).toThrow(
+    /outside numeric bounds/
+  );
+  expect(applySchema(arraySchema, { values: [0, 1] }).values).toEqual([0, 1]);
+});
+
+describe("numeric bounds in objects inside nested arrays", () => {
+  for (const type of ["number", "integer"] as const) {
+    const NESTED_SCHEMA = {
+      type: "object",
+      properties: {
+        rows: {
+          type: "array",
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                score: { type, minimum: 0, maximum: 10 },
+                nested: {
+                  type: "object",
+                  properties: { score: { type, minimum: 0, maximum: 10 } }
+                }
+              }
+            }
+          }
+        }
+      }
+    } satisfies TypedSchema<{
+      rows: { score?: number; nested?: { score: number } }[][];
+    }>;
+
+    for (const score of [-1, 11]) {
+      it(`applySchema_rejectsNestedArrayObject_${type}_${score}`, () => {
+        expect(() =>
+          applySchema(NESTED_SCHEMA, { rows: [[{ score }]] })
+        ).toThrow(/outside numeric bounds/);
+        expect(() =>
+          applySchema(NESTED_SCHEMA, { rows: [[{ nested: { score } }]] })
+        ).toThrow(/outside numeric bounds/);
+      });
+    }
+
+    it(`applySchema_acceptsNestedArrayBoundaries_${type}`, () => {
+      const rows = [
+        [{ score: 0 }, { score: 10 }, { nested: { score: 5 } }, {}]
+      ];
+      expect(applySchema(NESTED_SCHEMA, { rows }).rows).toEqual(rows);
+    });
+  }
+});
