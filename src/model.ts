@@ -181,7 +181,11 @@ export class ChatModel implements Model {
       | {
           message?:
             | AssistantMessage
-            | { content: string; tool_calls?: ToolCall[] };
+            | {
+                content: string;
+                tool_calls?: ToolCall[];
+                reasoning_details?: AssistantMessage["reasoning_details"];
+              };
         }
       | { choices: AssistantMessage[] }
   ) {
@@ -206,6 +210,8 @@ export class ChatModel implements Model {
         : msg.content || "",
       msg?.tool_calls
     );
+    if (msg.reasoning_details !== undefined)
+      message.reasoning_details = msg.reasoning_details;
     return { message };
   }
 

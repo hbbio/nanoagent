@@ -45,6 +45,8 @@ export interface UserMessage extends BaseMessage<"user"> {
 export interface AssistantMessage extends BaseMessage<"assistant"> {
   content: Content | null;
   tool_calls?: ToolCall[];
+  /** Opaque OpenRouter reasoning blocks, replayed unchanged on later turns. */
+  reasoning_details?: readonly Record<string, unknown>[];
   /** Native Responses output, including reasoning, replayed on later turns. */
   responseOutput?: readonly ResponseItem[];
 }

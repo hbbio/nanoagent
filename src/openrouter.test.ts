@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, spyOn } from "bun:test";
 import {
   ChatModel,
   content,
+  type Message,
   Nemotron3UltraFree,
   ollama,
   openrouter,
@@ -205,6 +206,92 @@ describe("OpenRouter", () => {
       { role: "tool", tool_call_id: "call_1", content: "HELLO" },
       { role: "tool", tool_call_id: "call_2", content: "WORLD" }
     ]);
+  });
+
+  it("replays encrypted reasoning details unchanged after a tool call", async () => {
+    const reasoningDetails = [
+      {
+        type: "reasoning.summary",
+        summary: "A tool is needed.",
+        id: null,
+        format: "google-gemini-v1",
+        index: 0
+      },
+      {
+        type: "reasoning.encrypted",
+        data: "opaque+/encrypted==",
+        id: "reasoning_1",
+        format: "google-gemini-v1",
+        index: 1
+      }
+    ];
+    const toolCalls = [
+      {
+        id: "call_1",
+        type: "function",
+        function: { name: "echo", arguments: '{"text":"hello"}' }
+      }
+    ];
+    fetchSpy
+      .mockResolvedValueOnce(
+        Response.json({
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: toolCalls,
+                reasoning_details: reasoningDetails
+              }
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(reply("HELLO"));
+
+    const echo = tool(
+      "echo",
+      "Echo uppercase text",
+      {
+        type: "object",
+        properties: { text: { type: "string" } },
+        required: ["text"]
+      },
+      async ({ text }: { text: string }) => content(text.toUpperCase())
+    );
+    const options = openrouter("google/gemini-3.1-pro-preview");
+    const first = await new ChatModel(options).complete(
+      [UserMessage("Echo hello")],
+      { tools: { echo } }
+    );
+    expect(first.messages[1]).toMatchObject({
+      role: "assistant",
+      tool_calls: toolCalls,
+      reasoning_details: reasoningDetails
+    });
+
+    const history: readonly Message[] = JSON.parse(
+      JSON.stringify(first.messages)
+    );
+    const snapshot = structuredClone(history);
+    const final = await new ChatModel(options).complete(history, {
+      tools: { echo }
+    });
+    expect(toText(final.messages.at(-1)?.content)).toBe("HELLO");
+    expect(history).toEqual(snapshot);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    const [, init] = fetchSpy.mock.calls[1] ?? [];
+    expect(JSON.parse(String(init?.body)).messages).toEqual([
+      { role: "user", content: "Echo hello" },
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: toolCalls,
+        reasoning_details: reasoningDetails
+      },
+      { role: "tool", tool_call_id: "call_1", content: "HELLO" }
+    ]);
+    expect(final.messages.at(-1)).not.toHaveProperty("reasoning_details");
   });
 
   it.each([401, 429, 503])(
