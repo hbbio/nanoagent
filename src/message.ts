@@ -201,10 +201,14 @@ export const composePatches = <M extends ChatMemory>(
 
   for (const patch of patches) {
     if (!patch) continue;
-    const beforeKeys = Object.keys(acc);
+    const before = acc;
     acc = patch(acc);
-    for (const k of Object.keys(acc)) {
-      if (!beforeKeys.includes(k) || acc[k] !== memory[k]) {
+    const keys = new Set([...Object.keys(before), ...Object.keys(acc)]);
+    for (const k of keys) {
+      if (
+        Object.hasOwn(before, k) !== Object.hasOwn(acc, k) ||
+        !Object.is(before[k], acc[k])
+      ) {
         if (written.has(k))
           throw new Error(`Memory‑patch conflict on key '${k}'.`);
         written.add(k);
