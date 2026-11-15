@@ -115,3 +115,55 @@ describe("applySchema", () => {
     expect(result).not.toHaveProperty("extra");
   });
 });
+
+describe("numeric bounds", () => {
+  const boundedSchema = {
+    type: "object",
+    properties: {
+      value: { type: "number", minimum: 0, maximum: 10 }
+    }
+  } satisfies TypedSchema<{ value?: number | string }>;
+
+  for (const value of [-1, 11, "-1", "11"]) {
+    it(`rejects out-of-range value ${value}`, () => {
+      expect(() => applySchema(boundedSchema, { value })).toThrow(
+        /Invalid value for property 'value'/
+      );
+    });
+  }
+
+  for (const value of [0, 10, "0", "10", 5]) {
+    it(`accepts in-range value ${value}`, () => {
+      expect(applySchema(boundedSchema, { value }).value).toBe(Number(value));
+    });
+  }
+
+  it("preserves optional numeric values", () => {
+    expect(applySchema(boundedSchema, {}).value).toBeUndefined();
+  });
+
+  it("validates bounds inside nested objects", () => {
+    const nestedSchema = {
+      type: "object",
+      properties: {
+        nested: boundedSchema
+      }
+    } satisfies TypedSchema<{ nested: { value: number } }>;
+    expect(() => applySchema(nestedSchema, { nested: { value: -1 } })).toThrow(
+      /Invalid value for property 'value'/
+    );
+  });
+});
+
+it("validates bounds on numeric array items", () => {
+  const arraySchema = {
+    type: "object",
+    properties: {
+      values: { type: "array", items: { type: "integer", minimum: 0 } }
+    }
+  } satisfies TypedSchema<{ values: number[] }>;
+  expect(() => applySchema(arraySchema, { values: [1, -1] })).toThrow(
+    /outside numeric bounds/
+  );
+  expect(applySchema(arraySchema, { values: [0, 1] }).values).toEqual([0, 1]);
+});

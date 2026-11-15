@@ -161,6 +161,11 @@ export const applySchema = <T extends Record<string, unknown>>(
     if (!validateType(value, propSchema)) {
       throw new Error(`Invalid type for property '${key}'`);
     }
+    if (!validateBounds(value, propSchema)) {
+      throw new Error(
+        `Invalid value for property '${key}': outside numeric bounds`
+      );
+    }
     if (!validateEnum(value, propSchema)) {
       const enumValues = (propSchema as JSONSchemaPrimitive).enum;
       throw new Error(
@@ -172,4 +177,23 @@ export const applySchema = <T extends Record<string, unknown>>(
   }
 
   return result as T;
+};
+
+const validateBounds = (
+  value: unknown,
+  schema: JSONSchemaProperty
+): boolean => {
+  if (schema.type === "array" && Array.isArray(value)) {
+    return value.every((item) => validateBounds(item, schema.items));
+  }
+  if (
+    typeof value !== "number" ||
+    (schema.type !== "number" && schema.type !== "integer")
+  ) {
+    return true;
+  }
+  return (
+    (schema.minimum === undefined || value >= schema.minimum) &&
+    (schema.maximum === undefined || value <= schema.maximum)
+  );
 };
